@@ -88,10 +88,44 @@ const DEFAULT_STARTERS = [
   'pikachu', 'eevee', 'riolu', 'ralts', 'rookidee', 'gible', 'dreepy', 'frigibax',
 ];
 
-function safeGet<T>(key: string, fallback: T): T {
-  if (typeof localStorage === 'undefined') return fallback;
+const memoryFallback = new Map<string, string>();
+
+function storageGetRaw(key: string): string | null {
   try {
-    const raw = localStorage.getItem(key);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem(key);
+    }
+  } catch {
+    // Cross-origin iframe with third-party storage blocked
+  }
+  return memoryFallback.get(key) ?? null;
+}
+
+function storageSetRaw(key: string, val: string): void {
+  memoryFallback.set(key, val);
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(key, val);
+    }
+  } catch {
+    // Quota or cross-origin iframe privacy mode
+  }
+}
+
+function storageRemoveRaw(key: string): void {
+  memoryFallback.delete(key);
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem(key);
+    }
+  } catch {
+    // Cross-origin iframe privacy mode
+  }
+}
+
+function safeGet<T>(key: string, fallback: T): T {
+  try {
+    const raw = storageGetRaw(key);
     if (!raw) return fallback;
     return { ...fallback, ...JSON.parse(raw) };
   } catch {
@@ -100,19 +134,17 @@ function safeGet<T>(key: string, fallback: T): T {
 }
 
 function safeSet(key: string, value: unknown): void {
-  if (typeof localStorage === 'undefined') return;
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    storageSetRaw(key, JSON.stringify(value));
   } catch {
-    // quota or private mode
+    // Serialization fallback
   }
 }
 
 export const SaveStorage = {
   getRogueRun(): RogueRunSave | null {
-    if (typeof localStorage === 'undefined') return null;
     try {
-      const raw = localStorage.getItem(KEYS.ROGUE_RUN);
+      const raw = storageGetRaw(KEYS.ROGUE_RUN);
       if (!raw) return null;
       const parsed = JSON.parse(raw) as RogueRunSave;
       if (!parsed || !Array.isArray(parsed.party) || parsed.party.length === 0) return null;
@@ -128,8 +160,7 @@ export const SaveStorage = {
   },
 
   clearRogueRun(): void {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.removeItem(KEYS.ROGUE_RUN);
+    storageRemoveRaw(KEYS.ROGUE_RUN);
   },
 
   getMeta(): MetaProgressSave {
@@ -163,9 +194,8 @@ export const SaveStorage = {
   },
 
   getCustomTeams(): SavedCustomTeam[] {
-    if (typeof localStorage === 'undefined') return [];
     try {
-      const raw = localStorage.getItem(KEYS.TEAMS);
+      const raw = storageGetRaw(KEYS.TEAMS);
       return raw ? (JSON.parse(raw) as SavedCustomTeam[]) : [];
     } catch {
       return [];

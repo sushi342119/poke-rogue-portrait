@@ -395,4 +395,14 @@ async function bootstrapApp(): Promise<void> {
   menuUI.openMainMenu();
 }
 
-void bootstrapApp();
+bootstrapApp().catch((err) => {
+  console.error('[PokéRogue Portrait] Bootstrap error:', err);
+  const deckRoot = document.getElementById('command-deck');
+  if (deckRoot) {
+    const msg = err instanceof Error ? err.message : String(err);
+    deckRoot.innerHTML = `<div class="deck-waiting" style="flex-direction:column;gap:8px;padding:16px;text-align:center;">
+      <strong style="color:#ff7b72;">启动异常：${msg}</strong>
+      <button onclick="location.reload()" style="padding:8px 16px;border-radius:8px;border:1px solid #58a6ff;background:#1f6feb;color:#fff;cursor:pointer;">点击重试</button>
+    </div>`;
+  }
+});
