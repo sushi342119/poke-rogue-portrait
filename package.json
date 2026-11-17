@@ -1,0 +1,32 @@
+{
+  "name": "poke-rogue-portrait",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "9:16 竖屏像素风宝可梦对战（Showdown 规则单/双打 & 对战工厂）与无尽肉鸽（PokéRogue 爬塔构筑）游戏",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "sync:assets": "node scripts/sync-assets.mjs"
+  },
+  "dependencies": {
+    "@capacitor/core": "^7.0.0",
+    "@pkmn/dex": "^0.11.0",
+    "@pkmn/img": "^0.3.5",
+    "@pkmn/protocol": "^0.7.4",
+    "@pkmn/randoms": "^0.11.0",
+    "@pkmn/sets": "^7.0.0",
+    "@pkmn/sim": "^0.11.0",
+    "gifuct-js": "^2.1.2",
+    "phaser": "^3.88.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.8.0",
+    "vite": "^6.2.0",
+    "vitest": "^3.0.0"
+  }
+}
