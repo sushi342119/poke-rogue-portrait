@@ -281,6 +281,24 @@ async function bootstrapApp(): Promise<void> {
     );
   }
 
+  // 注册安卓原生返回手势桥接：优先关闭弹窗 -> 返回主菜单 -> 根视图安全退回桌面后台
+  (window as unknown as { __handleAndroidBack?: () => string }).__handleAndroidBack = () => {
+    const topModal = modalRoot.querySelector('.sd-modal-backdrop:last-of-type');
+    if (topModal) {
+      topModal.remove();
+      audioEngine.playUiSfx('cancel');
+      return 'handled';
+    }
+    if (!screenRoot.classList.contains('hidden') && screenRoot.querySelector('.rogue-hub-screen')) {
+      rogueHubUI.hide();
+      void showMenuStageShowcase();
+      menuUI.openMainMenu();
+      audioEngine.playUiSfx('cancel');
+      return 'handled';
+    }
+    return 'root';
+  };
+
   // 初始进入主菜单并展示异色闪光喷火龙 vs 闪光裂空座像素待机舞台
   await showMenuStageShowcase();
   menuUI.openMainMenu();

@@ -12,6 +12,12 @@
 - **10 层群系择路与锁品质双轨商店**：每 10 波关底通关选择下一章节生态群系路线（拾取【城镇地图】解锁 3 分支与道馆情报）；战后双轨商店支持常驻金币补给、3 张精灵球品质免费战利品三选一与【锁定胶囊】锁品质刷新。
 - **双栈战术 AI 与全世代像素视听**：宿敌与道馆主支持接入外部 OpenAI 兼容大模型（严格遵守战争迷雾 + 超时无缝回退本地战术 AI）；配备 1,025 全世代简中图鉴、第 5 世代动态像素精灵、18 属性打击特效与原版叫声/BGM。
 
+## 在线畅玩与安卓 APK 下载
+
+- **网页在线版（即点即玩）**：https://sushi342119.github.io/poke-rogue-portrait/
+- **安卓正式签名版 APK（直装支持覆盖升级）**：[下载最新 `PokeRogue-Portrait-android.apk`](https://github.com/sushi342119/poke-rogue-portrait/releases/latest/download/PokeRogue-Portrait-android.apk)（或前往 [GitHub Releases](https://github.com/sushi342119/poke-rogue-portrait/releases) 查看历史版本与 SHA-256 校验值）
+- **跨端存档互通**：在主菜单右下角点击 **「⚙ 设置与存档」** 即可一键导出/导入 `PRP2:` 存档码，实现网页版与安卓客户端进度无缝同步。
+
 ## 本地运行与构建
 
 ```bash

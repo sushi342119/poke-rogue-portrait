@@ -2,16 +2,12 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.pokerogue.portrait',
-  appName: 'PokéRogue Portrait',
+  appName: 'PokéRogue',
   webDir: 'dist',
-  bundledWebRuntime: false,
+  backgroundColor: '#0d131a',
+  zoomEnabled: false,
   server: {
     androidScheme: 'https',
-  },
-  plugins: {
-    ScreenOrientation: {
-      orientation: 'portrait',
-    },
   },
 };
 

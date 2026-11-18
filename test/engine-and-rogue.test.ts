@@ -351,5 +351,14 @@ describe('3. 纯肉鸽刷塔深化系统：经典200层/无尽双模式、群系
     expect(endlessRun.party[0].awakened).toBe(true);
     expect(endlessRun.party[0].set.ivs.spa).toBe(31);
     expect(endlessRun.party[0].set.moves).toContain('Eruption');
+
+    // 验证网页版 ⇄ 安卓 APK 跨端存档码导出与导入恢复闭环
+    const backupCode = SaveStorage.exportSaveBundle();
+    expect(backupCode.startsWith('PRP2:')).toBe(true);
+    SaveStorage.clearRogueRun();
+    const restoreRes = SaveStorage.importSaveBundle(backupCode);
+    expect(restoreRes.ok).toBe(true);
+    expect(SaveStorage.getRogueRun()?.mode).toBe('endless');
+    expect(SaveStorage.getMeta().starterCandies.charmander).toBeGreaterThan(0);
   });
 });
