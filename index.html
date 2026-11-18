@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#141b24" />
+    <meta
+      name="description"
+      content="PokéRogue Portrait — 专为手机单手操作设计的 9:16 竖屏像素风宝可梦肉鸽刷塔游戏（Showdown 对战手感 × 经典200层/无尽双模式 × 扭蛋孵蛋与糖果养成）。"
+    />
+    <title>PokéRogue Portrait · 竖屏像素宝可梦肉鸽刷塔</title>
+    <script type="module" crossorigin src="./assets/index-qaJDzl8-.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/pkmn-DtiGWY4T.js">
+    <link rel="modulepreload" crossorigin href="./assets/phaser-Bp5BW9Ea.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-DtosB0kE.css">
+  </head>
+  <body>
+    <main id="app-shell" aria-label="PokéRogue Portrait 游戏主舞台">
+      <div id="portrait-frame">
+        <!-- 顶部像素战斗舞台 + Showdown 高透明战术 HUD -->
+        <section id="battle-viewport" aria-label="像素对战舞台">
+          <div id="phaser-stage"></div>
+          <div id="sprite-dom-layer" aria-hidden="true"></div>
+          <div id="stage-hud-layer"></div>
+        </section>
+
+        <!-- 底部单手拇指操控台 (Showdown Attack+Switch / 精灵球收服) -->
+        <section id="command-deck" aria-label="指令与收服操作面板"></section>
+
+        <!-- 全屏视图层 (刷塔主菜单 / 选宠糖果工坊 / 扭蛋孵蛋屋 / 战后双轨商店) -->
+        <section id="screen-layer" aria-label="模式与编队界面"></section>
+
+        <!-- 浮窗与抽屉层 (侦察浮窗 / Turn 战报流 / 学招替换 / AI 设置) -->
+        <aside id="modal-layer" aria-label="战术浮窗与设置"></aside>
+      </div>
+    </main>
+  </body>
+</html>
