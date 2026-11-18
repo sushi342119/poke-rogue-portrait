@@ -1,11 +1,20 @@
 import { Dex, type PokemonSet } from '@pkmn/sim';
-import { STAT_LABELS_ZH, STATUS_LABELS_ZH, TYPE_THEMES, getWaveLevelCap } from '../config/constants';
+import {
+  STAT_LABELS_ZH,
+  STATUS_LABELS_ZH,
+  TYPE_THEMES,
+  getWaveLevelCap,
+  type BiomeConfig,
+} from '../config/constants';
+import { GYM_LEADERS_BY_BIOME } from '../config/presets';
 import { audioEngine } from '../audio/AudioEngine';
-import type {
-  PendingMoveLearn,
-  RewardDraftItem,
-  RogueRunManager,
-  WaveVictorySummary,
+import {
+  getBiomeById,
+  type BallTier,
+  type PendingMoveLearn,
+  type RewardDraftItem,
+  type RogueRunManager,
+  type WaveVictorySummary,
 } from '../core/RogueRunManager';
 import { getItemZh, getMoveZh, getSpeciesZh } from '../data/dexRegistry';
 import { getItemPixelIconUrl, getPokemonMiniIconStyle } from '../data/spriteResolver';
@@ -25,10 +34,11 @@ const BALL_TIER_LABEL: Record<string, { zh: string; badgeCls: string }> = {
 };
 
 /**
- * PokéRogue 原味战后双轨整备与构筑商店：
+ * PokéRogue 原味战后双轨整备与构筑商店 (v2)：
  * 1. 野生满编替换 / 升级学招替换弹窗
- * 2. 顶部常驻金币补给行（伤药 / 复活 / 万灵药 / PP补剂 / 神奇糖果）
- * 3. 底部 3 张精灵球品质免费战利品三选一 + 金币递增刷新 + 闪光幸运值加成 + 首发轮换
+ * 2. 顶部常驻金币补给行（含黄金诱饵双打）+ 圣物状态条
+ * 3. 底部 3 张精灵球品质免费战利品三选一 + 【锁定胶囊】锁品质刷新
+ * 4. 每 10 波关底通关后的【生态群系路线分支抉择】弹窗
  */
 export class RogueShopUI {
   private screenRoot: HTMLElement;
@@ -52,16 +62,13 @@ export class RogueShopUI {
     this.callbacks = callbacks;
   }
 
-  /**
-   * 若野生收服时队伍已满 6 只，先让玩家选择替换哪只旧成员或放弃入队
-   */
   promptPartyFullCaptureIfNeeded(capturedSet: PokemonSet): Promise<void> {
     const run = this.rogueManager.getRun();
     if (!run) return Promise.resolve();
 
     if (run.party.length < 6) {
       this.rogueManager.addCapturedToParty(capturedSet);
-      this.callbacks.onToast(`✨ ${getSpeciesZh(capturedSet.species)} 已加入队伍！`, 'good');
+      this.callbacks.onToast(`✨ ${getSpeciesZh(capturedSet.species)} 已加入爬塔小队！`, 'good');
       return Promise.resolve();
     }
 
@@ -74,7 +81,7 @@ export class RogueShopUI {
             <h3>🔴 队伍已满 6 只 · 选择替换入队</h3>
           </div>
           <p class="sheet-desc">
-            新收服了 <b>${getSpeciesZh(capturedSet.species)}</b> (Lv.${capturedSet.level || 5})！图鉴与糖果奖励已永久解锁。点击下方任一现有队员进行替换，或直接保留原阵容：
+            新收服了 <b>${getSpeciesZh(capturedSet.species)}</b> (Lv.${capturedSet.level || 5})！初始解锁与糖果奖励已永久入账。点击下方任一现有队员进行替换，或直接保留原阵容：
           </p>
           <div class="party-replace-list">
             ${run.party
@@ -117,9 +124,6 @@ export class RogueShopUI {
     });
   }
 
-  /**
-   * 依次处理所有待决定的新招式学习替换（升级学招 & 商店招式学习器共用）
-   */
   async processMoveLearnQueue(queue: PendingMoveLearn[]): Promise<void> {
     for (const item of queue) {
       await this.promptSingleMoveLearn(item);
@@ -191,8 +195,81 @@ export class RogueShopUI {
   }
 
   /**
-   * 打开战后双轨商店主界面
+   * 每 10 波关底通关后弹出【下一章节生态群系路线选择】弹窗
    */
+  private promptBiomeRouteIfNeeded(): Promise<void> {
+    const run = this.rogueManager.getRun();
+    const pendingIds = run?.pendingBiomeChoices;
+    const choices: BiomeConfig[] =
+      this.summary?.biomeChoices ||
+      (pendingIds && pendingIds.length > 0 ? pendingIds.map((id) => getBiomeById(id)) : []);
+
+    if (!run || choices.length <= 1) return Promise.resolve();
+
+    const hasMap = run.relics.townMap > 0;
+
+    return new Promise((resolve) => {
+      const modal = document.createElement('div');
+      modal.className = 'sd-modal-backdrop';
+
+      const routeCardsHtml = choices
+        .map((b) => {
+          const gym = GYM_LEADERS_BY_BIOME[b.id];
+          const typeTags = b.primaryTypes
+            .slice(0, 4)
+            .map((t) => {
+              const th = TYPE_THEMES[t] || TYPE_THEMES.Normal;
+              return `<span class="sd-type-badge" style="background:${th.bg}">${th.zh}</span>`;
+            })
+            .join('');
+          return `
+            <button type="button" class="biome-route-card" data-biome-id="${b.id}" style="border-left:4px solid ${b.skyTop}">
+              <div class="brc-top">
+                <strong>🗺 前往【${b.zhName}】</strong>
+                <div class="brc-types">${typeTags}</div>
+              </div>
+              <div class="brc-sub">
+                ${
+                  hasMap && gym
+                    ? `道馆/首领情报：${gym.titleZh} ${gym.zhName}（建议提前备好克制招式）`
+                    : `主要栖息该属性野生宝可梦与群系霸主`
+                }
+              </div>
+            </button>
+          `;
+        })
+        .join('');
+
+      modal.innerHTML = `
+        <div class="sd-sheet">
+          <div class="sd-sheet-header">
+            <h3>🧭 第 ${run.wave - 1} 波关底突破 · 选择下一群系路线</h3>
+          </div>
+          <p class="sheet-desc">
+            ${
+              hasMap
+                ? '🗺 你的【城镇地图】已展开全部 3 条生态岔路与驻守道馆主情报：'
+                : '前方出现 2 条生态岔路（拾取【城镇地图】圣物可额外解锁第 3 路线与道馆情报）：'
+            }
+          </p>
+          <div class="biome-routes-stack">${routeCardsHtml}</div>
+        </div>
+      `;
+
+      modal.querySelectorAll<HTMLButtonElement>('[data-biome-id]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const picked = this.rogueManager.selectNextBiome(btn.dataset.biomeId!);
+          audioEngine.playUiSfx('confirm');
+          this.callbacks.onToast(`🧭 已踏入【${picked.zhName}】！`, 'info');
+          modal.remove();
+          resolve();
+        });
+      });
+
+      this.modalRoot.appendChild(modal);
+    });
+  }
+
   async openPostWaveShop(summary: WaveVictorySummary): Promise<void> {
     this.summary = summary;
     const run = this.rogueManager.getRun();
@@ -223,6 +300,7 @@ export class RogueShopUI {
       evolutions: [],
       pendingMoveLearns: [],
       biomeCleared: false,
+      hatchedEggs: [],
     };
     this.selectedMemberUid = run.party[0]?.uid || '';
     this.draftItems = this.rogueManager.rollFreeRewardDraft(false).items;
@@ -245,12 +323,22 @@ export class RogueShopUI {
     const rerollCost = this.rogueManager.getRerollCost();
     const catalog = this.rogueManager.getShopBuyCatalog();
 
-    const activeBuffPills = run.waveBuffs
-      .map(
-        (b) =>
-          `<span class="rogue-buff-pill">${STAT_LABELS_ZH[b.stat]}+${b.stages} (${b.wavesLeft}波)</span>`,
-      )
-      .join('');
+    const statusPills: string[] = [];
+    for (const b of run.waveBuffs) {
+      statusPills.push(`<span class="rogue-buff-pill">${STAT_LABELS_ZH[b.stat]}+${b.stages} (${b.wavesLeft}波)</span>`);
+    }
+    if (run.lureWavesLeft > 0) {
+      statusPills.push(`<span class="rogue-buff-pill lure">🍯 双打诱饵 (${run.lureWavesLeft}波)</span>`);
+    }
+    if (run.relics.townMap > 0) {
+      statusPills.push(`<span class="rogue-buff-pill">🗺 城镇地图</span>`);
+    }
+    if (run.relics.teraOrb > 0) {
+      statusPills.push(`<span class="rogue-buff-pill">💎 太晶宝珠</span>`);
+    }
+    if (run.relics.lockCapsule > 0) {
+      statusPills.push(`<span class="rogue-buff-pill">🔒 锁定胶囊</span>`);
+    }
 
     const partyHtml = run.party
       .map((m, idx) => {
@@ -259,13 +347,14 @@ export class RogueShopUI {
         const stBadge = m.status
           ? `<em class="mini-status" style="background:${STATUS_LABELS_ZH[m.status]?.color || '#777'}">${STATUS_LABELS_ZH[m.status]?.zh || m.status}</em>`
           : '';
+        const teraZh = TYPE_THEMES[m.set.teraType || 'Normal']?.zh || '一般';
         return `
           <div class="shop-party-card ${selected ? 'is-selected' : ''} ${m.fainted ? 'is-fainted' : ''}" data-member-uid="${m.uid}">
             <div class="spc-row">
               <span style="${getPokemonMiniIconStyle(m.set.species)}"></span>
               <div class="spc-meta">
                 <strong>${m.set.shiny ? '✦' : ''}${getSpeciesZh(m.set.species)} <small>Lv.${m.set.level}</small> ${stBadge}</strong>
-                <span>${m.fainted ? '濒死待复活' : `HP ${m.hp}/${m.maxhp}`}${m.set.item ? ` · ${getItemZh(m.set.item)}` : ''}</span>
+                <span>${m.fainted ? '濒死待复活' : `HP ${m.hp}/${m.maxhp}`}${run.relics.teraOrb > 0 ? ` · 💎${teraZh}` : ''}${m.set.item ? ` · ${getItemZh(m.set.item)}` : ''}</span>
               </div>
               ${
                 idx === 0
@@ -301,8 +390,8 @@ export class RogueShopUI {
           <button type="button" class="draft-reward-card ${tierInfo.badgeCls}" data-draft-uid="${item.uid}">
             <div class="drc-ball-header">
               <img class="drc-ball-icon" src="./assets/pr/pokeball/${item.tier}.png" alt="${item.tier}" />
-              <span>${tierInfo.zh}</span>
-              ${item.needsTargetMember ? '<em>作用于选中队员</em>' : '<em>全队生效</em>'}
+              <span>${tierInfo.zh}${run.rarityLocked ? ' 🔒已锁档' : ''}</span>
+              ${item.needsTargetMember ? '<em>作用于选中队员</em>' : '<em>全队/全局生效</em>'}
             </div>
             <div class="drc-main">
               <img class="drc-item-icon" src="${getItemPixelIconUrl(item.iconSlug)}" alt="${item.zhName}" />
@@ -316,58 +405,73 @@ export class RogueShopUI {
       })
       .join('');
 
-    const expNotes = this.summary?.expLogs.length
-      ? `<div class="shop-exp-banner">${this.summary.biomeCleared ? `<b>🎉 第 ${run.wave} 波关底击破！全队 HP/PP 已全满恢复，即将进入【${this.summary.nextBiomeZh}】！</b><br/>` : ''}${this.summary.expLogs.slice(0, 3).join(' · ')}</div>`
+    const voucherLine = this.summary?.voucherDropped
+      ? `<b style="color:#fbbf24;">🎁 里程碑掉落：${this.summary.voucherDropped.labelZh}（已存入扭蛋机！）</b><br/>`
       : '';
+    const clearLine = this.summary?.biomeCleared
+      ? `<b>🎉 第 ${run.wave} 波关底击破！全队 HP/PP 已满额恢复，选完战利品后将选择下一生态群系！</b><br/>`
+      : '';
+    const expNotes =
+      voucherLine || clearLine || this.summary?.expLogs.length
+        ? `<div class="shop-exp-banner">${voucherLine}${clearLine}${(this.summary?.expLogs || []).slice(0, 3).join(' · ')}</div>`
+        : '';
 
     this.screenRoot.innerHTML = `
       <div class="rogue-shop-screen">
         <header class="shop-topbar">
           <div>
-            <h2>🏕 第 ${run.wave} 波获胜整备</h2>
-            <span class="shop-sub">下波等级上限 Lv.${cap} · 球库存 🔴${run.balls.pb} 🔵${run.balls.gb} 🟡${run.balls.ub} 🟣${run.balls.mb}</span>
+            <h2>🏕 第 ${run.wave} 波整备 (${run.mode === 'endless' ? '无尽' : '经典200层'})</h2>
+            <span class="shop-sub">下波上限 Lv.${cap} · 球库存 🔴${run.balls.pb} 🔵${run.balls.gb} 🟡${run.balls.ub} 🟣${run.balls.mb}</span>
           </div>
           <div class="shop-wallet">
             <span class="wallet-gold">₽ ${run.money}</span>
-            <span class="wallet-luck" title="队伍闪光宝可梦提升战利品品质升级率">🍀 幸运 ${luckGrade}</span>
+            <span class="wallet-luck" title="闪光队友与闪光护符提升战利品品质升级率">🍀 幸运 ${luckGrade}</span>
           </div>
         </header>
 
         ${expNotes}
-        ${activeBuffPills ? `<div class="shop-buffs-strip">持续强化：${activeBuffPills}</div>` : ''}
+        ${statusPills.length > 0 ? `<div class="shop-buffs-strip">${statusPills.join('')}</div>` : ''}
 
         <section class="shop-section">
           <div class="shop-sec-title">
-            <span>① 点击选择使用道具的目标队员（可切换下波首发）</span>
+            <span>① 点击选择使用道具的目标队员（可切换首发）</span>
           </div>
           <div class="shop-party-grid">${partyHtml}</div>
         </section>
 
         <section class="shop-section">
           <div class="shop-sec-title">
-            <span>② 常驻金币补给商店（点击即对选中队员使用，不结束本轮）</span>
+            <span>② 常驻金币补给（点击即生效，不结束本轮）</span>
           </div>
           <div class="gold-shop-strip">${shopRowHtml}</div>
         </section>
 
         <section class="shop-section shop-draft-section">
           <div class="shop-sec-title">
-            <span>③ 免费战利品三选一（任选 1 项立即进入第 ${nextWave} 波）</span>
-            <button type="button" class="reroll-btn" id="btn-shop-reroll" ${run.money < rerollCost ? 'disabled' : ''}>
-              🎲 刷新 ₽${rerollCost}
-            </button>
+            <span>③ 战利品三选一（任选 1 项进入第 ${nextWave} 波）</span>
+            <div style="display:flex;gap:6px;align-items:center;">
+              ${
+                run.relics.lockCapsule > 0
+                  ? `<button type="button" class="lock-rarity-btn ${run.rarityLocked ? 'active' : ''}" id="btn-shop-lock">
+                      ${run.rarityLocked ? '🔒 已锁品质' : '🔓 锁品质'}
+                    </button>`
+                  : ''
+              }
+              <button type="button" class="reroll-btn" id="btn-shop-reroll" ${run.money < rerollCost ? 'disabled' : ''}>
+                🎲 刷新 ₽${rerollCost}
+              </button>
+            </div>
           </div>
           <div class="draft-cards-stack">${draftCardsHtml}</div>
         </section>
 
         <footer class="shop-footer">
-          <button type="button" class="primary-action-btn secondary" id="btn-shop-save-exit">保存并返回菜单</button>
+          <button type="button" class="primary-action-btn secondary" id="btn-shop-save-exit">保存并回主菜单</button>
           <button type="button" class="primary-action-btn" id="btn-shop-skip">跳过奖励 → 第 ${nextWave} 波</button>
         </footer>
       </div>
     `;
 
-    // 队员选中与设首发
     this.screenRoot.querySelectorAll<HTMLElement>('[data-member-uid]').forEach((card) => {
       card.addEventListener('click', (e) => {
         const leadBtn = (e.target as HTMLElement).closest('[data-lead-idx]') as HTMLElement | null;
@@ -385,7 +489,6 @@ export class RogueShopUI {
       });
     });
 
-    // 常驻金币购买
     this.screenRoot.querySelectorAll<HTMLButtonElement>('[data-buy-id]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const itemId = btn.dataset.buyId!;
@@ -401,9 +504,16 @@ export class RogueShopUI {
       });
     });
 
-    // 金币刷新三选一
+    this.screenRoot.querySelector('#btn-shop-lock')?.addEventListener('click', () => {
+      const res = this.rogueManager.toggleRarityLock();
+      audioEngine.playUiSfx(res.ok ? 'select' : 'cancel');
+      this.callbacks.onToast(res.message, res.ok ? 'info' : 'warn');
+      this.renderShop();
+    });
+
     this.screenRoot.querySelector('#btn-shop-reroll')?.addEventListener('click', () => {
-      const res = this.rogueManager.rollFreeRewardDraft(true);
+      const prevTiers: BallTier[] = this.draftItems.map((x) => x.tier);
+      const res = this.rogueManager.rollFreeRewardDraft(true, prevTiers);
       if (!res.ok) {
         audioEngine.playUiSfx('cancel');
         this.callbacks.onToast(res.reason || '无法刷新', 'warn');
@@ -414,11 +524,11 @@ export class RogueShopUI {
       this.renderShop();
     });
 
-    // 领取免费三选一并进入下一波
     this.screenRoot.querySelectorAll<HTMLButtonElement>('[data-draft-uid]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const chosen = this.draftItems.find((d) => d.uid === btn.dataset.draftUid);
         if (!chosen) return;
+        const needRouteModal = Boolean(run.pendingBiomeChoices && run.pendingBiomeChoices.length > 1);
         const res = this.rogueManager.claimRewardAndAdvance(chosen, this.selectedMemberUid);
         if (!res.ok) {
           audioEngine.playUiSfx('cancel');
@@ -435,14 +545,21 @@ export class RogueShopUI {
         if (res.pendingTmMove) {
           await this.processMoveLearnQueue([res.pendingTmMove]);
         }
+        if (needRouteModal) {
+          await this.promptBiomeRouteIfNeeded();
+        }
         this.hide();
         this.callbacks.onProceedNextWave();
       });
     });
 
-    this.screenRoot.querySelector('#btn-shop-skip')?.addEventListener('click', () => {
+    this.screenRoot.querySelector('#btn-shop-skip')?.addEventListener('click', async () => {
+      const needRouteModal = Boolean(run.pendingBiomeChoices && run.pendingBiomeChoices.length > 1);
       this.rogueManager.claimRewardAndAdvance(null);
       audioEngine.playUiSfx('confirm');
+      if (needRouteModal) {
+        await this.promptBiomeRouteIfNeeded();
+      }
       this.hide();
       this.callbacks.onProceedNextWave();
     });

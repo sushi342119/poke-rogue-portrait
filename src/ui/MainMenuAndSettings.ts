@@ -1,22 +1,20 @@
-import { BIOMES } from '../config/constants';
-import { audioEngine, type BgmSourceMode } from '../audio/AudioEngine';
 import { LLMTacticalAI } from '../ai/LLMTacticalAI';
-import type { RogueRunManager } from '../core/RogueRunManager';
-import { SaveStorage } from '../core/SaveStorage';
+import { audioEngine, type BgmSourceMode } from '../audio/AudioEngine';
+import { getBiomeById, type RogueRunManager } from '../core/RogueRunManager';
+import { SaveStorage, type RogueGameMode } from '../core/SaveStorage';
 import { getSpeciesZh } from '../data/dexRegistry';
 import { getPokemonMiniIconStyle } from '../data/spriteResolver';
 
 export interface MainMenuCallbacks {
   onResumeRogueRun: () => void;
-  onOpenRogueStarterSelect: () => void;
-  onOpenOfficialFree: () => void;
-  onOpenBattleFactory: () => void;
+  onOpenStarterWorkshop: (mode: RogueGameMode) => void;
+  onOpenEggGacha: () => void;
   onPrefsChanged: () => void;
   onToast: (msg: string, tone?: 'info' | 'warn' | 'good') => void;
 }
 
 /**
- * 竖屏主菜单、战绩总览、胜负结算弹窗与外部大模型/音频设置中心
+ * 纯正 PokéRogue 竖屏刷塔主菜单、战绩面板、胜负殿堂弹窗与战术大模型/音频设置中心
  */
 export class MainMenuAndSettings {
   private screenRoot: HTMLElement;
@@ -43,9 +41,15 @@ export class MainMenuAndSettings {
 
     this.screenRoot.classList.remove('hidden');
 
+    const totalVouchers =
+      (meta.vouchers.common || 0) + (meta.vouchers.plus || 0) + (meta.vouchers.premium || 0);
+    const totalEggs = meta.eggs.length;
+
     let resumeCardHtml = '';
     if (savedRun) {
-      const biome = BIOMES[savedRun.biomeIndex % BIOMES.length];
+      const biome = getBiomeById(savedRun.biomeId);
+      const modeTag = savedRun.mode === 'endless' ? '♾ 无尽刷塔' : '🧭 经典200层';
+      const luck = this.rogueManager.getPartyLuckGrade();
       const icons = savedRun.party
         .map(
           (m) =>
@@ -56,15 +60,15 @@ export class MainMenuAndSettings {
         <div class="menu-resume-card">
           <div class="mrc-head">
             <div>
-              <span class="mrc-tag">存档进行中</span>
-              <strong>第 ${savedRun.wave} 波 · ${biome.zhName}${savedRun.inShopPhase ? ' (商店整备)' : ''}</strong>
+              <span class="mrc-tag">${modeTag} · 幸运${luck}</span>
+              <strong>第 ${savedRun.wave} 波 · ${biome.zhName}${savedRun.inShopPhase ? ' (整备中)' : ''}</strong>
             </div>
             <span class="mrc-gold">₽${savedRun.money}</span>
           </div>
           <div class="mrc-party">${icons}</div>
           <div class="mrc-actions">
-            <button type="button" class="primary-action-btn" id="menu-btn-resume">▶ 继续爬塔征程</button>
-            <button type="button" class="deck-small-btn" id="menu-btn-new-rogue">新开一局</button>
+            <button type="button" class="primary-action-btn" id="menu-btn-resume">▶ 继续第 ${savedRun.wave} 波爬塔</button>
+            <button type="button" class="deck-small-btn" id="menu-btn-abandon-new">重开选宠</button>
           </div>
         </div>
       `;
@@ -73,7 +77,7 @@ export class MainMenuAndSettings {
     const aiBadge =
       prefs.llm.enabled && prefs.llm.apiKey.trim()
         ? `🤖 外部大模型已接入 (${prefs.llm.model})`
-        : '🧠 内置战术启发式 AI 就绪';
+        : '🧠 内置战术 AI 就绪';
 
     this.screenRoot.innerHTML = `
       <div class="main-menu-overlay">
@@ -81,7 +85,7 @@ export class MainMenuAndSettings {
           <div class="menu-brand-pill">
             <span class="brand-dot"></span>
             <strong>PokéRogue Portrait</strong>
-            <small>Showdown 竞技内核 × 无尽肉鸽</small>
+            <small>Showdown 战斗手感 × 纯正肉鸽刷塔</small>
           </div>
         </div>
 
@@ -89,35 +93,32 @@ export class MainMenuAndSettings {
           ${resumeCardHtml}
 
           <div class="menu-mode-stack">
-            ${
-              !savedRun
-                ? `
-              <button type="button" class="mode-entry-card mode-rogue" id="menu-card-rogue">
-                <div class="mec-icon">🧭</div>
-                <div class="mec-body">
-                  <strong>无尽肉鸽爬塔 (PokéRogue 1v1)</strong>
-                  <p>10费选宠 · 群系轮转 · 等级上限 · 野生收服 · Boss多段护盾 · 球色三选一商店</p>
-                </div>
-                <span class="mec-arrow">→</span>
-              </button>
-            `
-                : ''
-            }
-
-            <button type="button" class="mode-entry-card mode-official" id="menu-card-free">
-              <div class="mec-icon">⚔</div>
+            <button type="button" class="mode-entry-card mode-rogue" id="menu-card-classic">
+              <div class="mec-icon">🧭</div>
               <div class="mec-body">
-                <strong>正统自由对战 (Lv.50 单打3v3 / 双打4v4)</strong>
-                <p>Showdown 赛前公开选出 · 太晶化博弈 · 1025全图鉴编队 · Poképaste 导入导出</p>
+                <strong>经典爬塔模式 (200层宿敌·道馆·终局战)</strong>
+                <p>10费编队 · 6阶宿敌拦路 · 8大群系道馆主 · 10层择路分支 · 第200层无极汰那决战</p>
               </div>
               <span class="mec-arrow">→</span>
             </button>
 
-            <button type="button" class="mode-entry-card mode-factory" id="menu-card-factory">
-              <div class="mec-icon">🏭</div>
+            <button type="button" class="mode-entry-card mode-endless" id="menu-card-endless">
+              <div class="mec-icon">♾</div>
               <div class="mec-body">
-                <strong>对战工厂连胜挑战 (Battle Factory)</strong>
-                <p>随机竞技级成品池盲抽选秀 · 战后缴获换宠 · 零养成门槛纯拼大局观</p>
+                <strong>无尽刷塔模式 (高费神兽·双打刷闪·冲层)</strong>
+                <p>15费豪华开局 · 自带闪光护符 · 诱饵野生2v2双打 · 锁品质圣物叠层无限冲榜</p>
+              </div>
+              <span class="mec-arrow">→</span>
+            </button>
+
+            <button type="button" class="mode-entry-card mode-gacha" id="menu-card-gacha">
+              <div class="mec-icon">🥚</div>
+              <div class="mec-body">
+                <div class="mec-title-row">
+                  <strong>扭蛋机 & 孵蛋糖果屋</strong>
+                  ${totalVouchers > 0 ? `<span class="voucher-pill-alert">🎟 可用蛋券 ×${totalVouchers}</span>` : ''}
+                </div>
+                <p>招式UP / 传说UP / 闪光UP 三大机台 · 孵蛋中 ${totalEggs} 枚 · 初始宠糖果减费与觉醒</p>
               </div>
               <span class="mec-arrow">→</span>
             </button>
@@ -125,16 +126,16 @@ export class MainMenuAndSettings {
 
           <div class="menu-meta-bar">
             <div class="meta-stat">
-              <span>爬塔最高</span>
-              <strong>第 ${meta.highestRogueWave} 波</strong>
+              <span>经典200层</span>
+              <strong>${meta.classicClears > 0 ? `🏆 通关${meta.classicClears}次` : `第 ${meta.highestClassicWave}/200 波`}</strong>
             </div>
             <div class="meta-stat">
-              <span>工厂最高连胜</span>
-              <strong>${Math.max(meta.factoryBestStreakSingles, meta.factoryBestStreakDoubles)} 胜</strong>
+              <span>无尽最高</span>
+              <strong>第 ${meta.highestEndlessWave} 波</strong>
             </div>
             <div class="meta-stat">
-              <span>解锁初始宠</span>
-              <strong>${meta.unlockedStarters.length} 只</strong>
+              <span>初始宠 / 孵蛋</span>
+              <strong>${meta.unlockedStarters.length}只 / ${meta.totalEggsHatched}蛋</strong>
             </div>
           </div>
 
@@ -152,24 +153,24 @@ export class MainMenuAndSettings {
       this.callbacks.onResumeRogueRun();
     });
 
-    this.screenRoot.querySelector('#menu-btn-new-rogue')?.addEventListener('click', () => {
+    this.screenRoot.querySelector('#menu-btn-abandon-new')?.addEventListener('click', () => {
       audioEngine.playUiSfx('select');
-      this.callbacks.onOpenRogueStarterSelect();
+      this.callbacks.onOpenStarterWorkshop(savedRun?.mode || 'classic');
     });
 
-    this.screenRoot.querySelector('#menu-card-rogue')?.addEventListener('click', () => {
+    this.screenRoot.querySelector('#menu-card-classic')?.addEventListener('click', () => {
       audioEngine.playUiSfx('confirm');
-      this.callbacks.onOpenRogueStarterSelect();
+      this.callbacks.onOpenStarterWorkshop('classic');
     });
 
-    this.screenRoot.querySelector('#menu-card-free')?.addEventListener('click', () => {
+    this.screenRoot.querySelector('#menu-card-endless')?.addEventListener('click', () => {
       audioEngine.playUiSfx('confirm');
-      this.callbacks.onOpenOfficialFree();
+      this.callbacks.onOpenStarterWorkshop('endless');
     });
 
-    this.screenRoot.querySelector('#menu-card-factory')?.addEventListener('click', () => {
+    this.screenRoot.querySelector('#menu-card-gacha')?.addEventListener('click', () => {
       audioEngine.playUiSfx('confirm');
-      this.callbacks.onOpenBattleFactory();
+      this.callbacks.onOpenEggGacha();
     });
 
     this.screenRoot.querySelector('#menu-btn-settings')?.addEventListener('click', () => {
@@ -194,14 +195,14 @@ export class MainMenuAndSettings {
     modal.innerHTML = `
       <div class="sd-sheet sd-settings-sheet">
         <div class="sd-sheet-header">
-          <h3>⚙ 战术大模型对抗 & 音频设置</h3>
+          <h3>⚙ 道馆主大模型 AI & 音频设置</h3>
           <button type="button" class="sd-close-btn" id="st-close">关闭</button>
         </div>
 
         <div class="ed-field">
           <label class="checkbox-row">
             <input type="checkbox" id="st-llm-enable" ${prefs.llm.enabled ? 'checked' : ''} />
-            <span>启用外部大模型驱动对手训练家（实时博弈 + 个性台词）</span>
+            <span>启用外部大模型驱动宿敌、道馆主与天王冠军（实时博弈 + 个性台词）</span>
           </label>
           <p class="field-hint">严格遵守战争迷雾：大模型仅能看到公开战场情报，超时或断网自动无缝回退本地战术 AI。密钥仅保存在本地浏览器。</p>
         </div>
@@ -249,11 +250,11 @@ export class MainMenuAndSettings {
             </select>
           </div>
           <div class="ed-field">
-            <label>默认演出倍速</label>
+            <label>默认刷塔演出倍速</label>
             <select id="st-speed" class="tb-select">
               <option value="1" ${prefs.battleSpeed === 1 ? 'selected' : ''}>1× 标准节奏</option>
-              <option value="2" ${prefs.battleSpeed === 2 ? 'selected' : ''}>2× 竞技快节奏</option>
-              <option value="4" ${prefs.battleSpeed === 4 ? 'selected' : ''}>⚡ 极速瞬时结算</option>
+              <option value="2" ${prefs.battleSpeed === 2 ? 'selected' : ''}>2× 爽快刷塔</option>
+              <option value="4" ${prefs.battleSpeed === 4 ? 'selected' : ''}>⚡ 4× 极速冲层</option>
             </select>
           </div>
         </div>
@@ -317,7 +318,7 @@ export class MainMenuAndSettings {
   }
 
   /**
-   * 正统对战 / 肉鸽战败结算弹窗
+   * 爬塔战败结算 / 经典 200 层殿堂通关庆典弹窗
    */
   openBattleEndModal(opts: {
     won: boolean;
@@ -332,7 +333,7 @@ export class MainMenuAndSettings {
     modal.className = 'sd-modal-backdrop';
     modal.innerHTML = `
       <div class="sd-sheet result-modal-sheet">
-        <div class="result-badge ${opts.won ? 'win' : 'lose'}">${opts.won ? 'VICTORY' : 'DEFEAT'}</div>
+        <div class="result-badge ${opts.won ? 'win' : 'lose'}">${opts.won ? 'HALL OF FAME' : 'RUN ENDED'}</div>
         <h3>${opts.title}</h3>
         <p class="sheet-desc">${opts.subtitle}</p>
         <div class="modal-btn-row">

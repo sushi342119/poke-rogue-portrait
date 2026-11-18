@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import {
   BIOMES,
   DOUBLES_ANCHORS,
-  OFFICIAL_ARENA,
+  ENDGAME_BIOME,
   SINGLES_ANCHORS,
   STAGE_HEIGHT,
   STAGE_WIDTH,
@@ -67,7 +67,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   preload(): void {
-    const allBiomes = [...BIOMES, OFFICIAL_ARENA];
+    const allBiomes = [...BIOMES, ENDGAME_BIOME];
     const loadedKeys = new Set<string>();
     for (const b of allBiomes) {
       if (loadedKeys.has(b.arenaKey)) continue;

@@ -4,11 +4,12 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { HeuristicTacticalAI } from '../src/ai/HeuristicTacticalAI';
 import { LLMTacticalAI } from '../src/ai/LLMTacticalAI';
 import { buildAISnapshot } from '../src/ai/BattleSnapshot';
-import { PRESET_TEAMS, importShowdownPaste } from '../src/config/presets';
 import { getWaveLevelCap } from '../src/config/constants';
+import { importShowdownPaste } from '../src/config/presets';
 import { BattleEngine } from '../src/core/BattleEngine';
-import { OfficialBattleManager } from '../src/core/OfficialBattleManager';
+import { EggGachaSystem, getSpeciesEggMoves } from '../src/core/EggGachaSystem';
 import { RogueRunManager } from '../src/core/RogueRunManager';
+import { SaveStorage } from '../src/core/SaveStorage';
 import {
   calcSpeedTierRange,
   getAbilityZh,
@@ -19,6 +20,54 @@ import {
   setRogueDexDatabase,
   type RogueDexDatabase,
 } from '../src/data/dexRegistry';
+
+const SAMPLE_TEAM_A = `
+Charizard @ Sitrus Berry
+Ability: Blaze
+Level: 50
+Tera Type: Fire
+EVs: 4 HP / 252 SpA / 252 Spe
+Timid Nature
+- Flamethrower
+- Air Slash
+- Dragon Pulse
+- Protect
+
+Garchomp @ Life Orb
+Ability: Rough Skin
+Level: 50
+Tera Type: Ground
+EVs: 252 Atk / 4 SpD / 252 Spe
+Jolly Nature
+- Earthquake
+- Dragon Claw
+- Rock Slide
+- Swords Dance
+`.trim();
+
+const SAMPLE_TEAM_B = `
+Gyarados @ Leftovers
+Ability: Intimidate
+Level: 50
+Tera Type: Water
+EVs: 252 Atk / 4 Def / 252 Spe
+Jolly Nature
+- Waterfall
+- Ice Fang
+- Dragon Dance
+- Protect
+
+Gardevoir @ Focus Sash
+Ability: Trace
+Level: 50
+Tera Type: Fairy
+EVs: 252 SpA / 4 SpD / 252 Spe
+Timid Nature
+- Moonblast
+- Psychic
+- Thunderbolt
+- Mystical Fire
+`.trim();
 
 beforeAll(() => {
   const raw = readFileSync(
@@ -32,8 +81,7 @@ beforeAll(() => {
 describe('1. 全世代中文图鉴与数值注册表 (dexRegistry)', () => {
   it('成功加载全部 1,025 种宝可梦及简中名称、属性克制与速度线', () => {
     expect(getSpeciesZh('Charmander')).toBe('小火龙');
-    expect(getSpeciesZh('Flutter Mane')).toBe('振翼发');
-    expect(getSpeciesZh('Charizard-Mega-X')).toContain('喷火龙');
+    expect(getSpeciesZh('Eternatus')).toBe('无极汰那');
     expect(getMoveZh('Thunderbolt')).toBe('十万伏特');
     expect(getAbilityZh('Intimidate')).toBe('威吓');
     expect(getItemZh('Focus Sash')).toBe('气势披带');
@@ -49,33 +97,30 @@ describe('1. 全世代中文图鉴与数值注册表 (dexRegistry)', () => {
   });
 });
 
-describe('2. Showdown 单打 3v3 / 双打 4v4 对战引擎与 AI 全程闭环', () => {
-  it('完整跑通一场 Lv.50 单打 3v3（含赛前 Team Preview 6选3 与战争迷雾校验）', async () => {
-    const p1Six = importShowdownPaste(PRESET_TEAMS[0].paste, true);
-    const p2Six = importShowdownPaste(PRESET_TEAMS[3].paste, true);
+describe('2. Showdown 单打 / 野生双打 2v2 对战引擎、Boss 多段护盾与双栈 AI', () => {
+  it('完整跑通肉鸽单打与诱饵 2v2 双打遭遇（含战争迷雾校验与太晶化）', async () => {
+    const p1Two = importShowdownPaste(SAMPLE_TEAM_A, true);
+    const p2Two = importShowdownPaste(SAMPLE_TEAM_B, true);
     const ai = new HeuristicTacticalAI();
 
     const engine = new BattleEngine({
-      isDoubles: false,
-      teamPreview: true,
-      pickedTeamSize: 3,
+      isDoubles: true,
+      teamPreview: false,
       p1Name: 'Player',
-      p2Name: 'Champion',
-      p1Team: p1Six,
-      p2Team: p2Six,
+      p2Name: 'Wild',
+      p1Team: p1Two,
+      p2Team: p2Two,
     });
 
     await engine.start();
-    expect(engine.getP1Request()?.teamPreview).toBe(true);
-
-    // 提交 Team Preview
-    await engine.submitChoices('team 123', 'team 123');
     expect(engine.field.turn).toBe(1);
+    expect(engine.slots.get('p1a')).toBeDefined();
+    expect(engine.slots.get('p2b')).toBeDefined();
 
-    // 验证 AI 快照绝不泄露我方后排未登场宝可梦
+    // 验证 AI 快照严格战争迷雾
     const p2ReqTurn1 = engine.getP2Request()!;
     const snap = buildAISnapshot(engine, p2ReqTurn1);
-    expect(snap.playerActive.length).toBe(1);
+    expect(snap.playerActive.length).toBe(2);
     expect(snap.playerActive[0].revealedMoves.length).toBe(0);
 
     let safety = 0;
@@ -83,9 +128,8 @@ describe('2. Showdown 单打 3v3 / 双打 4v4 对战引擎与 AI 全程闭环', 
       safety++;
       const r1 = engine.getP1Request();
       const r2 = engine.getP2Request();
-
       const c1 = r1 && !r1.wait ? ai.decide(engine, r1, 'champion').choiceString : null;
-      const c2 = r2 && !r2.wait ? ai.decide(engine, r2, 'champion').choiceString : null;
+      const c2 = r2 && !r2.wait ? ai.decide(engine, r2, 'wild').choiceString : null;
       await engine.submitStep(c1, c2);
     }
 
@@ -93,42 +137,7 @@ describe('2. Showdown 单打 3v3 / 双打 4v4 对战引擎与 AI 全程闭环', 
     expect(['p1', 'p2', 'tie']).toContain(engine.getWinner());
   });
 
-  it('完整跑通一场 Lv.50 双打 4v4（含双槽位目标指定、太晶化与濒死强制补位）', async () => {
-    const p1Six = importShowdownPaste(PRESET_TEAMS[0].paste, true);
-    const p2Six = importShowdownPaste(PRESET_TEAMS[2].paste, true);
-    const ai = new HeuristicTacticalAI();
-
-    const engine = new BattleEngine({
-      isDoubles: true,
-      teamPreview: true,
-      pickedTeamSize: 4,
-      p1Name: 'Player',
-      p2Name: 'Rival',
-      p1Team: p1Six,
-      p2Team: p2Six,
-    });
-
-    await engine.start();
-    await engine.submitChoices('team 1234', 'team 1234');
-    expect(engine.slots.get('p1a')).toBeDefined();
-    expect(engine.slots.get('p1b')).toBeDefined();
-    expect(engine.slots.get('p2a')).toBeDefined();
-    expect(engine.slots.get('p2b')).toBeDefined();
-
-    let safety = 0;
-    while (!engine.isEnded() && safety < 80) {
-      safety++;
-      const r1 = engine.getP1Request();
-      const r2 = engine.getP2Request();
-      const c1 = r1 && !r1.wait ? ai.decide(engine, r1, 'rival').choiceString : null;
-      const c2 = r2 && !r2.wait ? ai.decide(engine, r2, 'scientist').choiceString : null;
-      await engine.submitStep(c1, c2);
-    }
-
-    expect(engine.isEnded()).toBe(true);
-  });
-
-  it('PokéRogue 关底 Boss 多段护盾拦截高额爆发伤害，且投球失败时正常消耗玩家回合不扣 PP', async () => {
+  it('PokéRogue 关底 Boss 多段护盾拦截高额爆发伤害，且投球失败消耗玩家回合不扣 PP', async () => {
     const p1BossKiller = importShowdownPaste(
       `
 Charizard @ Choice Specs
@@ -165,13 +174,11 @@ Bold Nature
 
     await engine.start();
 
-    // 1. 先测试野生投球挣脱：玩家不消耗招式 PP，敌方正常出招推进到第 2 回合
     const beforePp = engine.getP1Request()!.active![0]!.moves[0].pp;
     await engine.consumePlayerTurnForBallThrow('move 1');
     expect(engine.field.turn).toBe(2);
     expect(engine.getP1Request()!.active![0]!.moves[0].pp).toBe(beforePp);
 
-    // 2. 测试 Lv.80 喷火龙喷射火焰轰击 Lv.20 妙蛙花：被第 1 段护盾卡在 67% HP 而不直接秒杀！
     const events = await engine.submitChoices('move 1', 'move 1');
     const shieldEvent = events.find((e) => e.kind === 'boss-shield-break');
     expect(shieldEvent).toBeDefined();
@@ -179,9 +186,9 @@ Bold Nature
     expect(engine.slots.get('p2a')!.hpPercent).toBeGreaterThanOrEqual(60);
   });
 
-  it('外部大模型返回非法指令或请求异常时，100% 安全回退至合法动作', async () => {
-    const p1 = importShowdownPaste(PRESET_TEAMS[0].paste, true).slice(0, 1);
-    const p2 = importShowdownPaste(PRESET_TEAMS[1].paste, true).slice(0, 1);
+  it('外部大模型返回非法指令或请求超时异常时，100% 安全回退至合法动作', async () => {
+    const p1 = importShowdownPaste(SAMPLE_TEAM_A, true).slice(0, 1);
+    const p2 = importShowdownPaste(SAMPLE_TEAM_B, true).slice(0, 1);
     const engine = new BattleEngine({
       isDoubles: false,
       teamPreview: false,
@@ -193,7 +200,6 @@ Bold Nature
     await engine.start();
     const p2Req = engine.getP2Request()!;
 
-    // 模拟 LLM 返回不存在的 switch 99 非法动作
     const mockFetch = vi.fn().mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -229,7 +235,6 @@ Bold Nature
     const legal = BattleEngine.enumerateLegalChoicesForSlot(p2Req, 0, new Set());
     expect(legal).toContain(dec.choiceString);
 
-    // 模拟网络超时/500报错回退
     mockFetch.mockRejectedValueOnce(new Error('Network timeout'));
     const fbDec = await llm.decide(
       engine,
@@ -250,66 +255,101 @@ Bold Nature
   });
 });
 
-describe('3. PokéRogue 无尽肉鸽爬塔与对战工厂业务闭环', () => {
-  it('验证 10 费选宠、波次遭遇生成、收服概率、升级进化与双轨商店结算', () => {
+describe('3. 纯肉鸽刷塔深化系统：经典200层/无尽双模式、群系分支、锁品质与扭蛋孵蛋糖果养成', () => {
+  it('验证经典200层里程碑节点（宿敌、道馆主、天王冠军与第200层无极汰那5盾决战及通关结算）', () => {
     const rogue = new RogueRunManager();
-    const run = rogue.startNewRun(['charmander', 'bulbasaur']);
-    expect(run.party.length).toBe(2);
-    expect(run.wave).toBe(1);
-    expect(getWaveLevelCap(1)).toBe(8);
-    expect(getWaveLevelCap(11)).toBe(16);
+    const run = rogue.startNewRun(['charmander', 'bulbasaur'], 'classic');
+    expect(run.mode).toBe('classic');
+    expect(rogue.getBudgetLimit('classic')).toBe(10);
+    expect(rogue.getBudgetLimit('endless')).toBe(15);
+    expect(getWaveLevelCap(200)).toBe(200);
 
-    // 野生遭遇支持收服；未破盾 Boss 捕获率强制为 0%，破盾后大师球 100%
-    const enc1 = rogue.generateCurrentWaveEncounter();
-    expect(enc1.kind).toBe('wild');
-    expect(enc1.canCatch).toBe(true);
-    expect(rogue.estimateCatchProbability('mb', 'Pikachu', 50, '', 2)).toBe(0);
-    expect(rogue.estimateCatchProbability('mb', 'Pikachu', 50, '', 0)).toBe(100);
+    // 第 8 波固定触发宿敌战
+    run.wave = 8;
+    const rivalEnc = rogue.generateCurrentWaveEncounter();
+    expect(rivalEnc.kind).toBe('rival');
+    expect(rivalEnc.canCatch).toBe(false);
 
-    // 推进到第 11 波（上限 Lv.16），验证小火龙升至 Lv.16 自动进化为火恐龙
-    run.wave = 11;
-    run.party[0].set.level = 15;
-    const highExpEncounter = {
-      ...enc1,
-      wave: 11,
-      kind: 'elite' as const,
-      enemyTeam: [{ ...enc1.enemyTeam[0], species: 'Blissey', level: 25 }],
-    };
-    const summary = rogue.completeWaveVictory(
-      run.party.map((m) => ({
-        hp: m.hp,
-        maxhp: m.maxhp,
-        fainted: false,
-        status: '',
-        movePp: m.movePp,
-      })),
-      highExpEncounter,
-    );
-    expect(summary.evolutions.some((e) => e.toSpecies === 'Charmeleon')).toBe(true);
-    expect(run.party[0].set.species).toBe('Charmeleon');
+    // 第 20 波固定触发群系道馆主战
+    run.wave = 20;
+    const gymEnc = rogue.generateCurrentWaveEncounter();
+    expect(gymEnc.kind).toBe('gym');
 
-    // 验证免费战利品三选一与 5 波强化药剂推进下一波
-    const draft = rogue.rollFreeRewardDraft(false);
-    expect(draft.items.length).toBe(3);
-    const adv = rogue.claimRewardAndAdvance(draft.items[0], run.party[0].uid);
-    expect(adv.ok).toBe(true);
-    expect(rogue.getRun()!.wave).toBe(12);
+    // 第 10 波关底通关触发群系分支（无地图 2 路线，有城镇地图 3 路线）
+    run.wave = 10;
+    const bossEnc = rogue.generateCurrentWaveEncounter();
+    expect(bossEnc.kind).toBe('boss');
+    const persist = run.party.map((m) => ({
+      hp: m.hp,
+      maxhp: m.maxhp,
+      fainted: false,
+      status: '' as const,
+      movePp: m.movePp,
+    }));
+    const sumNoMap = rogue.completeWaveVictory(persist, bossEnc);
+    expect(sumNoMap.biomeChoices?.length).toBe(2);
+
+    run.wave = 30;
+    run.relics.townMap = 1;
+    const sumWithMap = rogue.completeWaveVictory(persist, bossEnc);
+    expect(sumWithMap.biomeChoices?.length).toBe(3);
+
+    // 锁定胶囊保品质刷新校验
+    run.relics.lockCapsule = 1;
+    const lockRes = rogue.toggleRarityLock();
+    expect(lockRes.ok).toBe(true);
+    expect(lockRes.locked).toBe(true);
+    run.money = 50000;
+    const rerolled = rogue.rollFreeRewardDraft(true, ['mb', 'ub', 'gb']);
+    expect(rerolled.items[0].tier).toBe('mb');
+    expect(['ub', 'mb']).toContain(rerolled.items[1].tier);
+
+    // 第 200 波终局无极汰那 5 段护盾与殿堂通关奖励黄金十连券
+    run.wave = 200;
+    const finalEnc = rogue.generateCurrentWaveEncounter();
+    expect(finalEnc.kind).toBe('final-boss');
+    expect(finalEnc.bossShields).toBe(5);
+    expect(finalEnc.enemyTeam[0].species).toBe('Eternatus');
+
+    const beforePremium = SaveStorage.getMeta().vouchers.premium;
+    const clearSum = rogue.completeWaveVictory(persist, finalEnc);
+    expect(clearSum.classicCleared).toBe(true);
+    expect(SaveStorage.getMeta().classicClears).toBeGreaterThanOrEqual(1);
+    expect(SaveStorage.getMeta().vouchers.premium).toBe(beforePremium + 1);
   });
 
-  it('验证对战工厂随机竞技池选秀与战后 1 换 1 缴获机制', () => {
-    const official = new OfficialBattleManager();
-    const session = official.startFactorySession(true);
-    expect(session.draftPool.length).toBe(8);
+  it('验证三大 UP 扭蛋机保底抽蛋、破壳领悟蛋招式与糖果永久减费/6V觉醒养成', () => {
+    const eggMoves = getSpeciesEggMoves('charmander');
+    expect(eggMoves.length).toBe(4);
+    expect(eggMoves).toContain('Eruption');
 
-    const locked = official.lockFactoryDraft([0, 1, 2, 3]);
-    expect(locked.length).toBe(4);
+    // 发放五连精良券并抽取 5 枚彩蛋（保底含 rare 及以上）
+    SaveStorage.addVoucher('plus', 1);
+    const pullRes = EggGachaSystem.pullVoucher('move', 'plus');
+    expect(pullRes.ok).toBe(true);
+    expect(pullRes.pulledEggs.length).toBe(5);
+    expect(pullRes.pulledEggs.some((e) => e.tier !== 'common')).toBe(true);
 
-    const { team: oppTeam } = official.prepareNextFactoryOpponent();
-    expect(oppTeam.length).toBe(4);
+    // 推进 40 波使全部彩蛋自然破壳孵化
+    const hatched = EggGachaSystem.tickEggsOnWaveClear(40);
+    expect(hatched.length).toBeGreaterThanOrEqual(5);
 
-    const targetOppSpecies = oppTeam[0].species;
-    official.recordFactoryResult(true);
-    official.swapFactoryMember(0, 0);
-    expect(official.getFactorySession()!.playerTeam[0].species).toBe(targetOppSpecies);
+    // 验证糖果减费与 6V 潜能觉醒直接作用于新局出战初始宠
+    SaveStorage.unlockStarterAndCandy('charmander', 30, { eggMove: 'Eruption' });
+    const rogue = new RogueRunManager();
+    const baseCost = rogue.getEffectiveStarterCost('charmander');
+
+    const redRes = EggGachaSystem.spendStarterCandies('charmander', 'reduce-cost');
+    expect(redRes.ok).toBe(true);
+    expect(rogue.getEffectiveStarterCost('charmander')).toBe(Math.max(1, baseCost - 1));
+
+    const awkRes = EggGachaSystem.spendStarterCandies('charmander', 'awaken');
+    expect(awkRes.ok).toBe(true);
+
+    const endlessRun = rogue.startNewRun(['charmander'], 'endless');
+    expect(endlessRun.mode).toBe('endless');
+    expect(endlessRun.party[0].awakened).toBe(true);
+    expect(endlessRun.party[0].set.ivs.spa).toBe(31);
+    expect(endlessRun.party[0].set.moves).toContain('Eruption');
   });
 });

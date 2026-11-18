@@ -203,33 +203,49 @@ export const BIOMES: BiomeConfig[] = [
   },
 ];
 
-export const OFFICIAL_ARENA: BiomeConfig = {
+export const ENDGAME_BIOME: BiomeConfig = {
   id: 'laboratory',
-  zhName: '对战竞技场',
+  zhName: '终焉深渊祭坛',
   arenaKey: 'laboratory',
-  primaryTypes: [],
-  skyTop: '#1f2d3d',
-  skyBottom: '#3c536e',
-  groundTint: '#48607a',
+  primaryTypes: ['Dragon', 'Poison', 'Psychic', 'Steel'],
+  skyTop: '#180f29',
+  skyBottom: '#3b1d52',
+  groundTint: '#2b2440',
   showdownBgm: 'bw-subway-trainer.mp3',
-  synthTheme: 'trainer',
+  synthTheme: 'boss',
 };
 
 /**
- * PokéRogue 波次等级上限计算（每 10 波解锁下一档等级上限）
+ * PokéRogue 生态群系拓扑分支表（每 10 层关底通关后可择路前进；持有【城镇地图】解锁完整 3 分支明牌情报）
+ */
+export const BIOME_TRANSITIONS: Record<string, string[]> = {
+  plains: ['forest', 'beach', 'cave'],
+  forest: ['beach', 'cave', 'snowy_forest'],
+  beach: ['volcano', 'snowy_forest', 'forest'],
+  cave: ['volcano', 'badlands', 'snowy_forest'],
+  volcano: ['badlands', 'abyss', 'beach'],
+  snowy_forest: ['cave', 'abyss', 'plains'],
+  badlands: ['volcano', 'abyss', 'plains'],
+  abyss: ['plains', 'volcano', 'snowy_forest'],
+};
+
+/**
+ * PokéRogue 波次等级上限计算（每 10 波解锁下一档等级上限，经典第 200 层固定上限 Lv.200）
  */
 export function getWaveLevelCap(wave: number): number {
   const chapter = Math.ceil(Math.max(1, wave) / 10);
-  const baseCaps = [8, 16, 25, 34, 44, 54, 64, 75, 86, 98];
+  const baseCaps = [
+    8, 16, 25, 34, 44, 54, 64, 75, 86, 98,
+    108, 118, 128, 138, 150, 160, 170, 180, 190, 200,
+  ];
   if (chapter <= baseCaps.length) {
     return baseCaps[chapter - 1];
   }
-  return 100 + (chapter - baseCaps.length) * 10;
+  return 200 + (chapter - baseCaps.length) * 15;
 }
 
 export const ASSET_URLS = {
   showdownDirect: 'https://play.pokemonshowdown.com',
-  showdownDevProxy: '/showdown-cdn',
   pokeApiSprites: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites',
   localPrAssets: './assets/pr',
   localShowdownAssets: './assets/showdown',

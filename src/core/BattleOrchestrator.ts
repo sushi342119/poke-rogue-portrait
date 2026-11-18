@@ -20,7 +20,7 @@ import {
 import type { BallTier, RogueRunManager, WaveEncounterSpec } from './RogueRunManager';
 import { SaveStorage } from './SaveStorage';
 
-export type BattleModeKind = 'rogue' | 'official-free' | 'official-factory';
+export type BattleModeKind = 'rogue';
 
 export interface ActiveBattleContext {
   mode: BattleModeKind;
@@ -32,7 +32,6 @@ export interface ActiveBattleContext {
   personality: TrainerPersonality;
   canCatch: boolean;
   rogueEncounter?: WaveEncounterSpec;
-  p2PreviewTeam?: PokemonSet[];
 }
 
 export interface BattleOrchestratorCallbacks {
@@ -45,12 +44,6 @@ export interface BattleOrchestratorCallbacks {
     thoughtSummary: string;
     source: 'heuristic' | 'llm' | 'llm-fallback' | 'thinking';
   }) => void;
-  onRequestTeamPreview: (
-    engine: BattleEngine,
-    req: ParsedSideRequest,
-    opponentPreviewTeam: PokemonSet[],
-    context: ActiveBattleContext,
-  ) => void;
   onRequestPlayerTurn: (
     engine: BattleEngine,
     req: ParsedSideRequest,
@@ -123,10 +116,11 @@ export class BattleOrchestrator {
     this.scene.applyBiome(context.biome);
 
     const bgmFile = context.trainer?.bgmTrack || context.biome.showdownBgm;
+    const kind = context.rogueEncounter?.kind;
     const synthTheme =
-      context.rogueEncounter?.kind === 'boss'
+      kind === 'boss' || kind === 'final-boss' || kind === 'champion'
         ? 'boss'
-        : context.rogueEncounter?.kind === 'elite'
+        : kind === 'elite' || kind === 'gym' || kind === 'rival'
           ? 'elite'
           : context.trainer
             ? 'trainer'
@@ -144,7 +138,7 @@ export class BattleOrchestrator {
     } else {
       this.callbacks.onAiBannerUpdate({
         trainer: undefined,
-        speechBubble: `野生的宝可梦跳出来了！`,
+        speechBubble: context.isDoubles ? '两只野生宝可梦同时跳出来了！' : '野生的宝可梦跳出来了！',
         thoughtSummary: '野生宝可梦本能应战中',
         source: 'heuristic',
       });
@@ -225,16 +219,6 @@ export class BattleOrchestrator {
 
     if (!p1Req) return;
 
-    if (p1Req.teamPreview) {
-      this.callbacks.onRequestTeamPreview(
-        this.engine,
-        p1Req,
-        this.context.p2PreviewTeam || [],
-        this.context,
-      );
-      return;
-    }
-
     this.callbacks.onRequestPlayerTurn(this.engine, p1Req, this.context);
   }
 
@@ -263,7 +247,7 @@ export class BattleOrchestrator {
   }
 
   /**
-   * 玩家提交指令（Team Preview 选阵 / 回合出招或换人 / 濒死补位）
+   * 玩家提交指令（回合出招或换人 / 濒死补位）
    */
   async submitPlayerChoice(p1Choice: string): Promise<void> {
     if (this.isBusy || !this.engine || !this.context) return;
@@ -302,18 +286,30 @@ export class BattleOrchestrator {
   }
 
   /**
-   * 肉鸽野生遭遇：投掷精灵球捕获宝可梦
+   * 肉鸽野生遭遇：投掷精灵球捕获宝可梦（支持单打及野生 2v2 双打先击倒 1 只后捕获规则）
    */
   async throwRoguePokeball(ballTier: BallTier): Promise<void> {
     if (this.isBusy || !this.engine || !this.context) return;
     const encounter = this.context.rogueEncounter;
-    const foeSlot = this.engine.slots.get('p2a');
-    if (!this.context.canCatch || !encounter || !foeSlot || foeSlot.fainted) {
+    const slotA = this.engine.slots.get('p2a');
+    const slotB = this.engine.slots.get('p2b');
+    const aliveFoes = [
+      slotA && !slotA.fainted ? { slot: slotA, idx: 0 } : null,
+      slotB && !slotB.fainted ? { slot: slotB, idx: 1 } : null,
+    ].filter((x): x is { slot: NonNullable<typeof slotA>; idx: number } => Boolean(x));
+
+    if (!this.context.canCatch || !encounter || aliveFoes.length === 0) {
       this.callbacks.onToast('当前无法投掷精灵球！', 'warn');
       return;
     }
+    if (aliveFoes.length >= 2) {
+      audioEngine.playUiSfx('cancel');
+      this.callbacks.onToast('野生双打需先击倒其中一只宝可梦才能瞄准投球！', 'warn');
+      return;
+    }
 
-    const foeSet = encounter.enemyTeam[0];
+    const foeSlot = aliveFoes[0].slot;
+    const foeSet = encounter.enemyTeam[aliveFoes[0].idx] || encounter.enemyTeam[0];
     const attempt = this.rogueManager.attemptPokeballThrow(
       ballTier,
       foeSet,

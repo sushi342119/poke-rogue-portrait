@@ -2411,3 +2411,577 @@ button:disabled {
   border-color: rgba(255, 169, 77, 0.6);
   color: #ffd8a8;
 }
+
+/* =========================================================================
+   Pure PokéRogue Tower-Climbing v2 (经典200层/无尽双模式 · 糖果工坊 · 扭蛋孵蛋 · 群系分支)
+   ========================================================================= */
+.mode-entry-card.mode-endless {
+  border-color: rgba(192, 132, 252, 0.42);
+  background: linear-gradient(135deg, rgba(88, 28, 135, 0.32), rgba(22, 30, 44, 0.92));
+}
+
+.mode-entry-card.mode-gacha {
+  border-color: rgba(251, 191, 36, 0.45);
+  background: linear-gradient(135deg, rgba(120, 83, 14, 0.28), rgba(22, 30, 44, 0.92));
+}
+
+.mec-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.voucher-pill-alert {
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.22);
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  color: #fde68a;
+}
+
+.hub-top-tabs {
+  display: flex;
+  gap: 5px;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.hub-tab-btn {
+  padding: 5px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-sub);
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hub-tab-btn.active {
+  background: rgba(59, 130, 246, 0.28);
+  border-color: #60a5fa;
+  color: #f8fafc;
+}
+
+.mini-pill-num {
+  font-style: normal;
+  font-size: 9.5px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #f59e0b;
+  color: #111827;
+  font-weight: 900;
+}
+
+.selected-roster-strip {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  padding: 4px 2px;
+  flex-shrink: 0;
+}
+
+.picked-starter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px 3px 3px;
+  border-radius: 8px;
+  background: rgba(45, 166, 100, 0.18);
+  border: 1px solid rgba(105, 219, 124, 0.45);
+  flex-shrink: 0;
+}
+
+.picked-starter-chip div {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.picked-starter-chip strong {
+  font-size: 10.5px;
+  color: #f1f5f9;
+}
+
+.picked-starter-chip small {
+  font-size: 9px;
+  color: #a7f3d0;
+}
+
+.chip-train-btn,
+.chip-rem-btn {
+  border: none;
+  border-radius: 5px;
+  padding: 2px 5px;
+  font-size: 10.5px;
+  background: rgba(15, 23, 42, 0.65);
+  color: #e2e8f0;
+}
+
+.empty-roster-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 8px;
+  width: 100%;
+}
+
+.filter-chips-bar {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  flex-shrink: 0;
+}
+
+.filter-chip {
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-sub);
+  white-space: nowrap;
+}
+
+.filter-chip.active {
+  background: rgba(96, 165, 250, 0.25);
+  border-color: #60a5fa;
+  color: #ffffff;
+}
+
+.rogue-starter-cell {
+  padding: 0;
+  overflow: hidden;
+  justify-content: space-between;
+}
+
+.rogue-starter-cell.is-locked {
+  opacity: 0.45;
+}
+
+.rsc-main-tap {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 3px 4px;
+  position: relative;
+}
+
+.rsc-main-tap:disabled {
+  opacity: 0.45;
+}
+
+.cost-badge.discounted {
+  background: rgba(16, 185, 129, 0.85);
+  color: #ffffff;
+}
+
+.shiny-corner {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  font-size: 10px;
+  color: #facc15;
+}
+
+.rsc-gear-btn {
+  width: 100%;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.55);
+  color: #fde68a;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 0;
+}
+
+.egg-moves-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.egg-move-pill {
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.egg-move-pill.locked {
+  opacity: 0.55;
+}
+
+.egg-move-pill strong {
+  font-size: 10.5px;
+  display: block;
+}
+
+.egg-move-pill span {
+  font-size: 9.5px;
+  color: var(--text-sub);
+}
+
+.egg-move-pill em {
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 800;
+  color: #69db7c;
+}
+
+.egg-move-pill.locked em {
+  color: var(--text-muted);
+}
+
+.candy-actions-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.candy-upgrade-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(30, 41, 59, 0.85);
+  color: var(--text-main);
+  text-align: left;
+}
+
+.candy-upgrade-btn:disabled {
+  opacity: 0.45;
+}
+
+.candy-upgrade-btn div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.candy-upgrade-btn strong {
+  font-size: 11.5px;
+}
+
+.candy-upgrade-btn span {
+  font-size: 9.8px;
+  color: var(--text-sub);
+}
+
+.candy-upgrade-btn em {
+  font-style: normal;
+  font-weight: 900;
+  font-size: 11px;
+  color: #fde68a;
+  white-space: nowrap;
+}
+
+/* 扭蛋工坊与孵蛋温箱 */
+.gacha-screen-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 10px;
+}
+
+.voucher-wallet-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.vw-item {
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.vw-item span {
+  font-size: 9.5px;
+  color: var(--text-sub);
+}
+
+.vw-item strong {
+  font-size: 13px;
+  color: #fde68a;
+}
+
+.gacha-machine-selector {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.gacha-machine-tab {
+  padding: 6px 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-main);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.gacha-machine-tab.active {
+  border-color: var(--mc-color, #60a5fa);
+  background: rgba(59, 130, 246, 0.18);
+  box-shadow: 0 0 0 1px var(--mc-color, #60a5fa) inset;
+}
+
+.gacha-machine-tab strong {
+  font-size: 10.5px;
+}
+
+.gacha-machine-tab small {
+  font-size: 8.8px;
+  color: var(--text-sub);
+}
+
+.gacha-cabinet-card {
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--bg-card);
+  border: 1.5px solid #eab308;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.gc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.gc-head h3 {
+  font-size: 13px;
+  margin: 0;
+}
+
+.gc-rate-pill {
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #0f172a;
+}
+
+.gc-desc {
+  font-size: 10.5px;
+  color: var(--text-sub);
+  margin: 0;
+  line-height: 1.35;
+}
+
+.gacha-pull-btns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.gacha-pull-btn {
+  padding: 8px 5px;
+  border-radius: 8px;
+  border: 1px solid rgba(96, 165, 250, 0.5);
+  background: rgba(30, 58, 138, 0.45);
+  color: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.gacha-pull-btn.plus {
+  border-color: rgba(52, 211, 153, 0.55);
+  background: rgba(6, 95, 70, 0.48);
+}
+
+.gacha-pull-btn.premium {
+  border-color: rgba(251, 191, 36, 0.65);
+  background: rgba(120, 53, 15, 0.55);
+}
+
+.gacha-pull-btn:disabled {
+  opacity: 0.4;
+}
+
+.gacha-pull-btn strong {
+  font-size: 10.8px;
+}
+
+.gacha-pull-btn span {
+  font-size: 9px;
+  color: #cbd5e1;
+}
+
+.hatchery-box {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+}
+
+.egg-slots-list,
+.hatch-results-list,
+.biome-routes-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.egg-slot-card {
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.65);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.esc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.esc-emoji {
+  font-size: 18px;
+}
+
+.esc-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.esc-info strong {
+  font-size: 11px;
+}
+
+.esc-info span {
+  font-size: 9.5px;
+  color: var(--text-sub);
+}
+
+.hatch-result-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.75);
+}
+
+.hrc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hrc-body strong {
+  font-size: 11.5px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.hrc-body span {
+  font-size: 10px;
+  color: #fde68a;
+}
+
+.new-unlock-tag {
+  font-style: normal;
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #10b981;
+  color: #052e16;
+  font-weight: 900;
+}
+
+.lock-rarity-btn {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 800;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(30, 41, 59, 0.8);
+  color: #fde68a;
+}
+
+.lock-rarity-btn.active {
+  background: rgba(245, 158, 11, 0.3);
+  border-color: #fbbf24;
+  color: #ffffff;
+}
+
+.rogue-buff-pill.lure {
+  background: rgba(236, 72, 153, 0.22);
+  border-color: rgba(244, 114, 182, 0.5);
+  color: #fbcfe8;
+}
+
+.biome-route-card {
+  padding: 9px 10px;
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text-main);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.brc-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.brc-top strong {
+  font-size: 12px;
+}
+
+.brc-types {
+  display: flex;
+  gap: 3px;
+}
+
+.brc-sub {
+  font-size: 10px;
+  color: var(--text-sub);
+}

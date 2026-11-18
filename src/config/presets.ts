@@ -1,14 +1,6 @@
 import { Teams, type PokemonSet } from '@pkmn/sim';
 import type { TrainerPersonality } from '../ai/BattleSnapshot';
 
-export interface CompetitivePresetTeam {
-  id: string;
-  zhTitle: string;
-  subtitle: string;
-  recommendedMode: 'singles' | 'doubles' | 'both';
-  paste: string;
-}
-
 export interface TrainerProfile {
   id: string;
   zhName: string;
@@ -17,445 +9,200 @@ export interface TrainerProfile {
   personality: TrainerPersonality;
   bgmTrack: string;
   introQuote: string;
+  specialtyTypes?: string[];
+  signatureSpecies?: string[];
 }
 
-export const TRAINER_PROFILES: TrainerProfile[] = [
-  {
-    id: 'cynthia',
-    zhName: '竹兰',
-    titleZh: '神奥联盟冠军',
-    spriteKey: 'cynthia',
-    personality: 'champion',
-    bgmTrack: 'spl-elite4.mp3',
-    introQuote: '在你的宝可梦眼中，我看到了渴望胜利的光芒！',
-  },
-  {
-    id: 'red',
-    zhName: '赤红',
-    titleZh: '白银山传奇训练家',
-    spriteKey: 'red',
-    personality: 'champion',
-    bgmTrack: 'hgss-kanto-trainer.mp3',
-    introQuote: '…………！（压低帽檐，拿出了精灵球！）',
-  },
-  {
-    id: 'steven',
-    zhName: '大吾',
-    titleZh: '丰缘联盟冠军',
-    spriteKey: 'steven',
-    personality: 'scientist',
-    bgmTrack: 'oras-rival.mp3',
-    introQuote: '终究还是我的钢系阵容最为坚不可摧，来验证一下吧。',
-  },
-  {
-    id: 'n',
-    zhName: 'N',
-    titleZh: '追求理想的训练家',
-    spriteKey: 'n',
-    personality: 'scientist',
-    bgmTrack: 'bw-rival.mp3',
-    introQuote: '让我倾听你与宝可梦在战场上的心声吧！',
-  },
-  {
-    id: 'blue',
+/**
+ * 经典爬塔模式固定宿敌（第 8 / 25 / 55 / 95 / 145 / 195 层阶梯拦路）
+ */
+export const RIVAL_PROFILE: TrainerProfile = {
+  id: 'rival_hilda',
+  zhName: '透子',
+  titleZh: '宿命劲敌',
+  spriteKey: 'hilda',
+  personality: 'rival',
+  bgmTrack: 'bw-rival.mp3',
+  introQuote: '你也爬到这一层了？让我看看你的队伍成长了多少吧！',
+  specialtyTypes: ['Fire', 'Flying', 'Dragon'],
+  signatureSpecies: ['Rayquaza', 'Staraptor', 'Arcanine'],
+};
+
+/**
+ * 8 大生态群系镇守道馆馆主与首领（经典模式第 20 / 50 / 80 / 110 / 140 / 170 层）
+ */
+export const GYM_LEADERS_BY_BIOME: Record<string, TrainerProfile> = {
+  plains: {
+    id: 'gym_blue',
     zhName: '青绿',
     titleZh: '常青道馆馆主',
     spriteKey: 'blue',
     personality: 'rival',
     bgmTrack: 'bw2-kanto-gym-leader.mp3',
-    introQuote: '不管单打还是双打，我都会用实力彻底压制你！',
+    introQuote: '平原上的微风可吹不倒我的均衡强攻阵容！',
+    specialtyTypes: ['Normal', 'Flying', 'Electric'],
+    signatureSpecies: ['Pidgeot', 'Electivire', 'Snorlax'],
   },
-  {
-    id: 'ghetsis',
+  forest: {
+    id: 'gym_alder',
+    zhName: '阿戴克',
+    titleZh: '深林守护冠军',
+    spriteKey: 'alder',
+    personality: 'champion',
+    bgmTrack: 'bw-trainer.mp3',
+    introQuote: '与森林万物的羁绊，将化作坚韧不拔的力量！',
+    specialtyTypes: ['Bug', 'Grass', 'Fairy'],
+    signatureSpecies: ['Volcarona', 'Venusaur', 'Gardevoir'],
+  },
+  beach: {
+    id: 'gym_misty',
+    zhName: '小霞',
+    titleZh: '华蓝道馆馆主',
+    spriteKey: 'misty',
+    personality: 'rival',
+    bgmTrack: 'hgss-kanto-trainer.mp3',
+    introQuote: '用席卷海岸的怒涛攻势一鼓作气冲垮你！',
+    specialtyTypes: ['Water', 'Ice'],
+    signatureSpecies: ['Starmie', 'Gyarados', 'Lapras'],
+  },
+  cave: {
+    id: 'gym_steven',
+    zhName: '大吾',
+    titleZh: '晶窟钢系大师',
+    spriteKey: 'steven',
+    personality: 'scientist',
+    bgmTrack: 'oras-rival.mp3',
+    introQuote: '千锤百炼的矿石与钢躯，绝不留一丝破绽。',
+    specialtyTypes: ['Steel', 'Rock', 'Ground'],
+    signatureSpecies: ['Metagross', 'Aggron', 'Excadrill'],
+  },
+  volcano: {
+    id: 'gym_blaine',
+    zhName: '夏伯',
+    titleZh: '红莲道馆馆主',
+    spriteKey: 'blaine',
+    personality: 'boss',
+    bgmTrack: 'hgss-kanto-trainer.mp3',
+    introQuote: '哇哈哈哈！准备好迎接燃尽一切的熔岩烈焰了吗？',
+    specialtyTypes: ['Fire', 'Dragon'],
+    signatureSpecies: ['Arcanine', 'Magmortar', 'Charizard'],
+  },
+  snowy_forest: {
+    id: 'gym_n',
+    zhName: 'N',
+    titleZh: '极寒理想追寻者',
+    spriteKey: 'n',
+    personality: 'scientist',
+    bgmTrack: 'bw-rival.mp3',
+    introQuote: '在这片静谧雪原中，聆听宝可梦真正的呼唤吧！',
+    specialtyTypes: ['Ice', 'Psychic', 'Ghost'],
+    signatureSpecies: ['Zoroark', 'Weavile', 'Frosmoth'],
+  },
+  badlands: {
+    id: 'gym_hilbert',
+    zhName: '斗也',
+    titleZh: '峡谷战术先锋',
+    spriteKey: 'hilbert',
+    personality: 'rival',
+    bgmTrack: 'bw-subway-trainer.mp3',
+    introQuote: '荒芜峡谷的沙暴里，唯有果断出击才能取胜！',
+    specialtyTypes: ['Ground', 'Dark', 'Fighting'],
+    signatureSpecies: ['Krookodile', 'Lucario', 'Garchomp'],
+  },
+  abyss: {
+    id: 'gym_ghetsis',
     zhName: '魁奇思',
-    titleZh: '等离子队幕后首脑',
+    titleZh: '深渊幕后首脑',
+    spriteKey: 'ghetsis',
+    personality: 'boss',
+    bgmTrack: 'spl-elite4.mp3',
+    introQuote: '踏入深渊之人，将在绝对的压制力面前绝望！',
+    specialtyTypes: ['Dragon', 'Dark', 'Ghost'],
+    signatureSpecies: ['Hydreigon', 'Kingambit', 'Dragapult'],
+  },
+};
+
+/**
+ * 经典模式第 182~190 波 四天王与联盟冠军终盘连战配置
+ */
+export const CLASSIC_ELITE_GAUNTLET: Record<number, TrainerProfile> = {
+  182: {
+    id: 'e4_steven',
+    zhName: '大吾',
+    titleZh: '天王试炼·壹',
+    spriteKey: 'steven',
+    personality: 'scientist',
+    bgmTrack: 'oras-rival.mp3',
+    introQuote: '欢迎来到高塔之巅，第一道钢铁防线由我镇守！',
+    specialtyTypes: ['Steel', 'Rock'],
+    signatureSpecies: ['Metagross', 'Corviknight', 'Archaludon'],
+  },
+  184: {
+    id: 'e4_n',
+    zhName: 'N',
+    titleZh: '天王试炼·贰',
+    spriteKey: 'n',
+    personality: 'scientist',
+    bgmTrack: 'bw-rival.mp3',
+    introQuote: '你的信念能否超越理想与真实的界限？',
+    specialtyTypes: ['Dragon', 'Electric', 'Fire'],
+    signatureSpecies: ['Zekrom', 'Reshiram', 'Zoroark'],
+  },
+  186: {
+    id: 'e4_ghetsis',
+    zhName: '魁奇思',
+    titleZh: '天王试炼·叁',
     spriteKey: 'ghetsis',
     personality: 'boss',
     bgmTrack: 'bw-subway-trainer.mp3',
-    introQuote: '在绝对的战术计算面前，毫无胜算可言！',
+    introQuote: '休想再往前踏出半步！全部给我粉碎吧！',
+    specialtyTypes: ['Dark', 'Poison', 'Dragon'],
+    signatureSpecies: ['Hydreigon', 'Roaring Moon', 'Toxapex'],
   },
+  188: {
+    id: 'e4_red',
+    zhName: '赤红',
+    titleZh: '天王试炼·肆',
+    spriteKey: 'red',
+    personality: 'champion',
+    bgmTrack: 'hgss-kanto-trainer.mp3',
+    introQuote: '…………！（赤红压低帽檐，派出了千锤百炼的王牌！）',
+    specialtyTypes: ['Electric', 'Fire', 'Water', 'Grass'],
+    signatureSpecies: ['Pikachu', 'Charizard', 'Blastoise', 'Venusaur', 'Snorlax'],
+  },
+  190: {
+    id: 'champ_cynthia',
+    zhName: '竹兰',
+    titleZh: '巅峰联盟冠军',
+    spriteKey: 'cynthia',
+    personality: 'champion',
+    bgmTrack: 'spl-elite4.mp3',
+    introQuote: '在前往第 200 层终焉祭坛之前，用尽全力战胜我吧！',
+    specialtyTypes: ['Dragon', 'Ground', 'Ghost', 'Fairy'],
+    signatureSpecies: ['Garchomp', 'Spiritomb', 'Togekiss', 'Lucario', 'Milotic'],
+  },
+};
+
+/**
+ * 路人/精英训练家池（供普通波次与无尽模式使用）
+ */
+export const TRAINER_PROFILES: TrainerProfile[] = [
+  GYM_LEADERS_BY_BIOME.plains,
+  GYM_LEADERS_BY_BIOME.cave,
+  GYM_LEADERS_BY_BIOME.snowy_forest,
+  GYM_LEADERS_BY_BIOME.badlands,
+  CLASSIC_ELITE_GAUNTLET[188],
+  CLASSIC_ELITE_GAUNTLET[190],
 ];
 
-export const PRESET_TEAMS: CompetitivePresetTeam[] = [
-  {
-    id: 'vgc-tailwind-balance',
-    zhTitle: '顺风联防王牌队',
-    subtitle: '水熊 + 振翼发 + 炽焰咆哮虎 + 龙卷云（单双打皆强）',
-    recommendedMode: 'both',
-    paste: `
-Urshifu-Rapid-Strike @ Mystic Water
-Ability: Unseen Fist
-Level: 50
-Tera Type: Water
-EVs: 4 HP / 252 Atk / 252 Spe
-Jolly Nature
-- Surging Strikes
-- Close Combat
-- Aqua Jet
-- Protect
-
-Flutter Mane @ Booster Energy
-Ability: Protosynthesis
-Level: 50
-Tera Type: Fairy
-EVs: 116 HP / 140 SpA / 252 Spe
-Timid Nature
-- Moonblast
-- Shadow Ball
-- Dazzling Gleam
-- Protect
-
-Incineroar @ Sitrus Berry
-Ability: Intimidate
-Level: 50
-Tera Type: Grass
-EVs: 244 HP / 100 Def / 164 SpD
-Careful Nature
-- Flare Blitz
-- Knock Off
-- Parting Shot
-- Fake Out
-
-Tornadus @ Covert Cloak
-Ability: Prankster
-Level: 50
-Tera Type: Steel
-EVs: 252 HP / 4 SpA / 252 Spe
-Timid Nature
-- Bleakwind Storm
-- Tailwind
-- Rain Dance
-- Taunt
-
-Rillaboom @ Assault Vest
-Ability: Grassy Surge
-Level: 50
-Tera Type: Fire
-EVs: 252 HP / 196 Atk / 60 SpD
-Adamant Nature
-- Grassy Glide
-- Wood Hammer
-- U-turn
-- Fake Out
-
-Gholdengo @ Leftovers
-Ability: Good as Gold
-Level: 50
-Tera Type: Steel
-EVs: 212 HP / 196 SpA / 100 Spe
-Modest Nature
-- Make It Rain
-- Shadow Ball
-- Nasty Plot
-- Protect
-`.trim(),
-  },
-  {
-    id: 'rain-hyper-offense',
-    zhTitle: '暴雨疾行强攻队',
-    subtitle: '大嘴鸥降雨 + 铝钢桥龙 + 刺龙王 + 铁包袱高速洗地',
-    recommendedMode: 'both',
-    paste: `
-Pelipper @ Damp Rock
-Ability: Drizzle
-Level: 50
-Tera Type: Ground
-EVs: 244 HP / 252 Def / 12 SpA
-Bold Nature
-- Weather Ball
-- Hurricane
-- Tailwind
-- U-turn
-
-Archaludon @ Assault Vest
-Ability: Stamina
-Level: 50
-Tera Type: Grass
-EVs: 252 HP / 196 SpA / 60 SpD
-Modest Nature
-- Electro Shot
-- Flash Cannon
-- Draco Meteor
-- Body Press
-
-Kingdra @ Life Orb
-Ability: Swift Swim
-Level: 50
-Tera Type: Water
-EVs: 4 HP / 252 SpA / 252 Spe
-Modest Nature
-- Muddy Water
-- Hydro Pump
-- Draco Meteor
-- Ice Beam
-
-Iron Bundle @ Focus Sash
-Ability: Quark Drive
-Level: 50
-Tera Type: Ice
-EVs: 4 HP / 252 SpA / 252 Spe
-Timid Nature
-- Freeze-Dry
-- Hydro Pump
-- Icy Wind
-- Protect
-
-Scizor @ Choice Band
-Ability: Technician
-Level: 50
-Tera Type: Steel
-EVs: 236 HP / 252 Atk / 20 Spe
-Adamant Nature
-- Bullet Punch
-- U-turn
-- Close Combat
-- Knock Off
-
-Zapdos @ Sitrus Berry
-Ability: Static
-Level: 50
-Tera Type: Electric
-EVs: 204 HP / 156 SpA / 148 Spe
-Modest Nature
-- Thunder
-- Hurricane
-- Volt Switch
-- Roost
-`.trim(),
-  },
-  {
-    id: 'sun-trickroom-hybrid',
-    zhTitle: '晴天古剑空间双轴队',
-    subtitle: '煤炭龟重喷 + 月月熊空间 + 振翼发高速收割',
-    recommendedMode: 'doubles',
-    paste: `
-Torkoal @ Charcoal
-Ability: Drought
-Level: 50
-Tera Type: Fire
-EVs: 252 HP / 252 SpA / 4 SpD
-Quiet Nature
-IVs: 0 Spe
-- Eruption
-- Heat Wave
-- Earth Power
-- Protect
-
-Ursaluna-Bloodmoon @ Life Orb
-Ability: Mind's Eye
-Level: 50
-Tera Type: Normal
-EVs: 252 HP / 252 SpA / 4 SpD
-Quiet Nature
-IVs: 0 Spe
-- Blood Moon
-- Hyper Voice
-- Earth Power
-- Protect
-
-Porygon2 @ Eviolite
-Ability: Download
-Level: 50
-Tera Type: Flying
-EVs: 244 HP / 140 Def / 124 SpD
-Sassy Nature
-IVs: 0 Spe
-- Tera Blast
-- Ice Beam
-- Trick Room
-- Recover
-
-Amoonguss @ Rocky Helmet
-Ability: Regenerator
-Level: 50
-Tera Type: Water
-EVs: 244 HP / 156 Def / 108 SpD
-Relaxed Nature
-IVs: 0 Spe
-- Spore
-- Rage Powder
-- Pollen Puff
-- Protect
-
-Raging Bolt @ Magnet
-Ability: Protosynthesis
-Level: 50
-Tera Type: Electric
-EVs: 196 HP / 252 SpA / 60 Spe
-Modest Nature
-- Thunderclap
-- Thunderbolt
-- Draco Meteor
-- Protect
-
-Chien-Pao @ Focus Sash
-Ability: Sword of Ruin
-Level: 50
-Tera Type: Ghost
-EVs: 4 HP / 252 Atk / 252 Spe
-Jolly Nature
-- Icicle Crash
-- Sucker Punch
-- Sacred Sword
-- Protect
-`.trim(),
-  },
-  {
-    id: 'sandstorm-singles-core',
-    zhTitle: '沙暴兄弟单打王道队',
-    subtitle: '班基拉斯 + 龙头地鼠 + 多龙巴鲁托 + 钢铠鸦联防',
-    recommendedMode: 'singles',
-    paste: `
-Tyranitar @ Smooth Rock
-Ability: Sand Stream
-Level: 50
-Tera Type: Flying
-EVs: 252 HP / 180 Atk / 76 SpD
-Adamant Nature
-- Stone Edge
-- Knock Off
-- Earthquake
-- Stealth Rock
-
-Excadrill @ Life Orb
-Ability: Sand Rush
-Level: 50
-Tera Type: Ground
-EVs: 4 HP / 252 Atk / 252 Spe
-Jolly Nature
-- Earthquake
-- Iron Head
-- Rock Slide
-- Swords Dance
-
-Dragapult @ Choice Specs
-Ability: Infiltrator
-Level: 50
-Tera Type: Ghost
-EVs: 4 HP / 252 SpA / 252 Spe
-Timid Nature
-- Shadow Ball
-- Draco Meteor
-- Flamethrower
-- U-turn
-
-Corviknight @ Rocky Helmet
-Ability: Mirror Armor
-Level: 50
-Tera Type: Water
-EVs: 252 HP / 252 Def / 4 SpD
-Impish Nature
-- Brave Bird
-- Body Press
-- U-turn
-- Roost
-
-Gastrodon @ Leftovers
-Ability: Storm Drain
-Level: 50
-Tera Type: Poison
-EVs: 252 HP / 140 Def / 116 SpD
-Calm Nature
-- Earth Power
-- Surf
-- Ice Beam
-- Recover
-
-Kingambit @ Black Glasses
-Ability: Supreme Overlord
-Level: 50
-Tera Type: Dark
-EVs: 212 HP / 252 Atk / 44 Spe
-Adamant Nature
-- Kowtow Cleave
-- Sucker Punch
-- Iron Head
-- Swords Dance
-`.trim(),
-  },
-  {
-    id: 'classic-champions-allstar',
-    zhTitle: '历代冠军全明星队',
-    subtitle: '烈咬陆鲨 + 喷火龙 + 路卡利欧 + 巨金怪 + 美纳斯 + 耿鬼',
-    recommendedMode: 'singles',
-    paste: `
-Garchomp @ Focus Sash
-Ability: Rough Skin
-Level: 50
-Tera Type: Ground
-EVs: 4 HP / 252 Atk / 252 Spe
-Jolly Nature
-- Earthquake
-- Outrage
-- Rock Tomb
-- Swords Dance
-
-Charizard @ Heavy-Duty Boots
-Ability: Blaze
-Level: 50
-Tera Type: Fire
-EVs: 4 HP / 252 SpA / 252 Spe
-Timid Nature
-- Flamethrower
-- Air Slash
-- Scorching Sands
-- Dragon Pulse
-
-Lucario @ Life Orb
-Ability: Inner Focus
-Level: 50
-Tera Type: Normal
-EVs: 4 HP / 252 Atk / 252 Spe
-Jolly Nature
-- Close Combat
-- Extreme Speed
-- Meteor Mash
-- Swords Dance
-
-Metagross @ Assault Vest
-Ability: Clear Body
-Level: 50
-Tera Type: Steel
-EVs: 252 HP / 252 Atk / 4 SpD
-Adamant Nature
-- Heavy Slam
-- Psychic Fangs
-- Bullet Punch
-- Earthquake
-
-Milotic @ Flame Orb
-Ability: Marvel Scale
-Level: 50
-Tera Type: Fairy
-EVs: 252 HP / 252 Def / 4 SpA
-Bold Nature
-- Scald
-- Ice Beam
-- Alluring Voice
-- Recover
-
-Gengar @ Choice Scarf
-Ability: Cursed Body
-Level: 50
-Tera Type: Ghost
-EVs: 4 HP / 252 SpA / 252 Spe
-Timid Nature
-- Shadow Ball
-- Sludge Bomb
-- Thunderbolt
-- Dazzling Gleam
-`.trim(),
-  },
-];
-
-export function importShowdownPaste(paste: string, forceLevel50 = true): PokemonSet[] {
-  const imported = Teams.import(paste) || [];
+/**
+ * 轻量级 Showdown 文本解析辅助（仅供单元测试快速构造对局阵容使用）
+ */
+export function importShowdownPaste(paste: string, forceLv50 = false): PokemonSet[] {
+  const imported = Teams.import(paste) as PokemonSet[] | null;
+  if (!imported || imported.length === 0) return [];
   return imported.map((s) => ({
     ...s,
-    level: forceLevel50 ? 50 : s.level || 50,
+    level: forceLv50 ? 50 : s.level || 50,
   }));
-}
-
-export function exportShowdownPaste(sets: PokemonSet[]): string {
-  return Teams.export(sets);
 }
