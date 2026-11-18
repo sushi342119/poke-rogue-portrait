@@ -1,0 +1,178 @@
+name: Build & Publish Android APK Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'GitHub Release 版本标签（例如 v2.0.0）'
+        required: false
+        default: 'v2.0.0'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: 'apk-release'
+  cancel-in-progress: false
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Setup Java 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Compute release version metadata
+        id: meta
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="${{ inputs.tag || 'v2.0.0' }}"
+          fi
+          VERSION_NAME="${TAG#v}"
+          VERSION_CODE=$((200 + GITHUB_RUN_NUMBER))
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
+          echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies & Capacitor Android platform
+        run: |
+          npm ci
+          npm install --no-save @capacitor/android@7.6.10
+
+      - name: Run unit tests & build production web bundle
+        run: |
+          npm test
+          npm run build
+
+      - name: Generate & customize Capacitor Android project
+        env:
+          APK_VERSION_CODE: ${{ steps.meta.outputs.version_code }}
+          APK_VERSION_NAME: ${{ steps.meta.outputs.version_name }}
+        run: |
+          npx cap add android
+          node scripts/customize-android.mjs
+          npx cap sync android
+
+      - name: Assemble Android Release APK via Gradle
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Align & Sign Release APK (v1 + v2 + v3 signatures)
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEY_ALIAS_SECRET: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS_SECRET: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          UNSIGNED_APK="android/app/build/outputs/apk/release/app-release-unsigned.apk"
+          if [[ ! -f "$UNSIGNED_APK" ]]; then
+            echo "Error: Unsigned APK not found at $UNSIGNED_APK"
+            exit 1
+          fi
+
+          if [[ -n "$KEYSTORE_B64" ]]; then
+            echo "$KEYSTORE_B64" | base64 -d > /tmp/release.keystore
+            KEY_ALIAS="${KEY_ALIAS_SECRET}"
+            KEY_PASS="${KEY_PASS_SECRET}"
+          else
+            keytool -genkeypair -v -keystore /tmp/release.keystore -storetype PKCS12 \
+              -alias pokerogue -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass PokeRogueFallback2026 -keypass PokeRogueFallback2026 \
+              -dname "CN=PokeRogue Portrait, OU=Mobile, O=PokeRogue, C=CN"
+            KEY_ALIAS="pokerogue"
+            KEY_PASS="PokeRogueFallback2026"
+          fi
+
+          ANDROID_SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          BUILD_TOOLS="$(ls -d "${ANDROID_SDK}/build-tools/"* | sort -V | tail -n 1)"
+          echo "Using Android build-tools: $BUILD_TOOLS"
+
+          "$BUILD_TOOLS/zipalign" -f -p 4 "$UNSIGNED_APK" /tmp/app-aligned.apk
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks /tmp/release.keystore \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass "pass:$KEY_PASS" \
+            --key-pass "pass:$KEY_PASS" \
+            --v1-signing-enabled true \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
+            --out "PokeRogue-Portrait-android.apk" \
+            /tmp/app-aligned.apk
+
+          cp "PokeRogue-Portrait-android.apk" "PokeRogue-Portrait-${TAG}.apk"
+          "$BUILD_TOOLS/apksigner" verify --verbose "PokeRogue-Portrait-android.apk"
+          rm -f /tmp/release.keystore /tmp/app-aligned.apk
+
+      - name: Upload Signed APK to Workflow Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: PokeRogue-Portrait-${{ steps.meta.outputs.tag }}-APK
+          path: |
+            PokeRogue-Portrait-android.apk
+            PokeRogue-Portrait-${{ steps.meta.outputs.tag }}.apk
+
+      - name: Create or Update GitHub Release with Signed APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION_NAME: ${{ steps.meta.outputs.version_name }}
+          VERSION_CODE: ${{ steps.meta.outputs.version_code }}
+        run: |
+          SHA256="$(sha256sum PokeRogue-Portrait-android.apk | awk '{print $1}')"
+          SIZE_H="$(du -h PokeRogue-Portrait-android.apk | awk '{print $1}')"
+
+          sed 's/^          //' <<EOF > /tmp/release-notes.md
+          ## 📱 PokéRogue Portrait · 纯正竖屏宝可梦肉鸽刷塔安卓客户端 (${TAG})
+
+          专为手机单手竖屏握持打造的 **Showdown 对战手感 × 纯正 PokéRogue 刷塔** 独立安装包（已启用 \`v1 + v2 + v3\` 正式签名，支持直接覆盖升级保留本地存档）。
+
+          ### ✨ 核心玩法特性
+          - **双爬塔模式**：
+            - **经典爬塔（200 层）**：10 费开局 · 6 阶宿敌拦路 · 8 大群系道馆主 · 四天王冠军连战 · 第 200 层 5 盾无极汰那决战
+            - **无尽刷塔（∞ 层）**：15 费最多 6 宠开局 · 自带闪耀护符 · 黄金诱饵野生 2v2 双打 · 无限冲层
+          - **扭蛋孵蛋 & 糖果潜能工坊**：招式 UP / 传说 UP / 闪光 UP 三大扭蛋机、波次破壳孵化、初始宠糖果永久减费与 6V 觉醒被动
+          - **原生安卓体验优化**：严格锁定 9:16 竖屏、沉浸式深色状态栏、像素王冠精灵球桌面图标、防误触侧滑返回手势保护、内置全 1025 简中图鉴秒开
+          - **网页版 ⇄ 安卓版存档互通**：点击主菜单右下角 **「⚙ 设置与存档」** 即可一键导出/导入 \`PRP2:\` 跨端存档码
+
+          ### 📦 安装包校验信息
+          - **直接下载（固定最新链接）**：\`PokeRogue-Portrait-android.apk\`（约 ${SIZE_H}）
+          - **版本归档包**：\`PokeRogue-Portrait-${TAG}.apk\`（\`versionName=${VERSION_NAME}\`, \`versionCode=${VERSION_CODE}\`）
+          - **SHA-256**：\`${SHA256}\`
+          EOF
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              "PokeRogue-Portrait-android.apk" \
+              "PokeRogue-Portrait-${TAG}.apk" \
+              --clobber
+            gh release edit "$TAG" \
+              --title "PokéRogue Portrait ${TAG} · 安卓正式签名版 APK" \
+              --notes-file /tmp/release-notes.md
+          else
+            gh release create "$TAG" \
+              "PokeRogue-Portrait-android.apk" \
+              "PokeRogue-Portrait-${TAG}.apk" \
+              --target "${{ github.sha }}" \
+              --title "PokéRogue Portrait ${TAG} · 安卓正式签名版 APK" \
+              --notes-file /tmp/release-notes.md
+          fi

@@ -343,4 +343,67 @@ export const SaveStorage = {
   savePrefs(prefs: UserPreferencesSave): void {
     safeSet(KEYS.PREFS, prefs);
   },
+
+  /**
+   * 导出跨端存档码（包含元进度、当前爬塔进度与音频倍速偏好，不含敏感 API Key）
+   */
+  exportSaveBundle(): string {
+    const prefs = this.getPrefs();
+    const safePrefs: UserPreferencesSave = {
+      ...prefs,
+      llm: { ...prefs.llm, apiKey: '' },
+    };
+    const payload = {
+      schema: 'prp-backup-v2',
+      exportedAt: new Date().toISOString(),
+      meta: this.getMeta(),
+      run: this.getRogueRun(),
+      prefs: safePrefs,
+    };
+    const json = JSON.stringify(payload);
+    const bytes = new TextEncoder().encode(json);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return `PRP2:${btoa(binary)}`;
+  },
+
+  /**
+   * 从跨端存档码导入恢复（支持网页版 ⇄ 安卓 APK 互传）
+   */
+  importSaveBundle(rawInput: string): { ok: boolean; message: string } {
+    const trimmed = rawInput.trim();
+    if (!trimmed) {
+      return { ok: false, message: '请先粘贴以 PRP2: 开头的存档备份码。' };
+    }
+    try {
+      const b64 = trimmed.startsWith('PRP2:') ? trimmed.slice(5).trim() : trimmed;
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const parsed = JSON.parse(new TextDecoder().decode(bytes)) as {
+        schema?: string;
+        meta?: MetaProgressSave;
+        run?: RogueRunSave | null;
+      };
+      if (!parsed || parsed.schema !== 'prp-backup-v2' || !parsed.meta || !Array.isArray(parsed.meta.unlockedStarters)) {
+        return { ok: false, message: '存档码格式校验失败，请确认复制完整。' };
+      }
+      this.saveMeta(parsed.meta);
+      if (parsed.run && Array.isArray(parsed.run.party) && parsed.run.party.length > 0) {
+        this.saveRogueRun(parsed.run);
+      } else {
+        this.clearRogueRun();
+      }
+      return {
+        ok: true,
+        message: `存档恢复成功！已同步 ${parsed.meta.unlockedStarters.length} 只初始宠与爬塔进度。`,
+      };
+    } catch {
+      return { ok: false, message: '存档码解析失败，请检查是否漏字或包含多余字符。' };
+    }
+  },
 };

@@ -1,9 +1,13 @@
+import { Capacitor } from '@capacitor/core';
 import { LLMTacticalAI } from '../ai/LLMTacticalAI';
 import { audioEngine, type BgmSourceMode } from '../audio/AudioEngine';
 import { getBiomeById, type RogueRunManager } from '../core/RogueRunManager';
 import { SaveStorage, type RogueGameMode } from '../core/SaveStorage';
 import { getSpeciesZh } from '../data/dexRegistry';
 import { getPokemonMiniIconStyle } from '../data/spriteResolver';
+
+const LATEST_APK_URL =
+  'https://github.com/sushi342119/poke-rogue-portrait/releases/latest/download/PokeRogue-Portrait-android.apk';
 
 export interface MainMenuCallbacks {
   onResumeRogueRun: () => void;
@@ -141,7 +145,14 @@ export class MainMenuAndSettings {
 
           <div class="menu-bottom-bar">
             <span class="menu-ai-status">${aiBadge}</span>
-            <button type="button" class="menu-settings-btn" id="menu-btn-settings">⚙ AI 与音频设置</button>
+            <div style="display:flex;gap:6px;align-items:center;">
+              ${
+                !Capacitor.isNativePlatform()
+                  ? `<a class="menu-settings-btn" href="${LATEST_APK_URL}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;color:#7ee787;border-color:rgba(63,185,80,0.45);">📱 安卓 APK</a>`
+                  : ''
+              }
+              <button type="button" class="menu-settings-btn" id="menu-btn-settings">⚙ 设置与存档</button>
+            </div>
           </div>
         </div>
       </div>
@@ -195,7 +206,7 @@ export class MainMenuAndSettings {
     modal.innerHTML = `
       <div class="sd-sheet sd-settings-sheet">
         <div class="sd-sheet-header">
-          <h3>⚙ 道馆主大模型 AI & 音频设置</h3>
+          <h3>⚙ 设置、AI 与跨端存档</h3>
           <button type="button" class="sd-close-btn" id="st-close">关闭</button>
         </div>
 
@@ -204,7 +215,7 @@ export class MainMenuAndSettings {
             <input type="checkbox" id="st-llm-enable" ${prefs.llm.enabled ? 'checked' : ''} />
             <span>启用外部大模型驱动宿敌、道馆主与天王冠军（实时博弈 + 个性台词）</span>
           </label>
-          <p class="field-hint">严格遵守战争迷雾：大模型仅能看到公开战场情报，超时或断网自动无缝回退本地战术 AI。密钥仅保存在本地浏览器。</p>
+          <p class="field-hint">严格遵守战争迷雾：大模型仅能看到公开战场情报，超时或断网自动无缝回退本地战术 AI。密钥仅保存在本地设备。</p>
         </div>
 
         <div class="preset-chips-row">
@@ -264,6 +275,17 @@ export class MainMenuAndSettings {
           <span>关闭宝可梦叫声与打击音效</span>
         </label>
 
+        <hr class="sheet-divider" />
+
+        <div class="ed-field">
+          <label>💾 跨端存档迁移 (网页版 ⇄ 安卓 APK)</label>
+          <div class="ed-search-row">
+            <input type="text" id="st-backup-code" class="ed-input" placeholder="点击右侧导出复制，或粘贴 PRP2:... 存档码导入" autocomplete="off" />
+            <button type="button" class="deck-small-btn" id="st-export-save">导出复制</button>
+            <button type="button" class="deck-small-btn" id="st-import-save">导入恢复</button>
+          </div>
+        </div>
+
         <button type="button" class="primary-action-btn" id="st-save">保存全部设置</button>
       </div>
     `;
@@ -275,6 +297,31 @@ export class MainMenuAndSettings {
         (modal.querySelector('#st-llm-url') as HTMLInputElement).value = chip.dataset.ep || '';
         (modal.querySelector('#st-llm-model') as HTMLInputElement).value = chip.dataset.md || '';
       });
+    });
+
+    modal.querySelector('#st-export-save')?.addEventListener('click', async () => {
+      const code = SaveStorage.exportSaveBundle();
+      const inputEl = modal.querySelector('#st-backup-code') as HTMLInputElement;
+      inputEl.value = code;
+      inputEl.select();
+      try {
+        await navigator.clipboard.writeText(code);
+        this.callbacks.onToast('存档备份码已复制到剪贴板！可直接粘贴到安卓 APK 导入。', 'good');
+      } catch {
+        this.callbacks.onToast('已生成存档码，请长按输入框全选复制。', 'info');
+      }
+    });
+
+    modal.querySelector('#st-import-save')?.addEventListener('click', () => {
+      const inputEl = modal.querySelector('#st-backup-code') as HTMLInputElement;
+      const res = SaveStorage.importSaveBundle(inputEl.value);
+      if (!res.ok) {
+        this.callbacks.onToast(res.message, 'warn');
+        return;
+      }
+      audioEngine.playUiSfx('confirm');
+      this.callbacks.onToast(res.message, 'good');
+      window.setTimeout(() => window.location.reload(), 650);
     });
 
     modal.querySelector('#st-test-llm')?.addEventListener('click', async () => {
