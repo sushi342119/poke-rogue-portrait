@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "9:16 竖屏像素风宝可梦对战（Showdown 规则单/双打 & 对战工厂）与无尽肉鸽（PokéRogue 爬塔构筑）游戏",
+  "description": "9:16 竖屏单手像素风宝可梦肉鸽刷塔游戏（Showdown 对战手感 × 经典200层/无尽双模式 × 蛋券扭蛋孵蛋与糖果潜能养成）",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

@@ -2,6 +2,11 @@ import type { PokemonSet } from '@pkmn/sim';
 import type { BgmSourceMode } from '../audio/AudioEngine';
 import { DEFAULT_LLM_CONFIG, type LLMProviderConfig } from '../ai/LLMTacticalAI';
 
+export type RogueGameMode = 'classic' | 'endless';
+export type EggTier = 'common' | 'rare' | 'epic' | 'legendary';
+export type GachaMachineType = 'move' | 'legendary' | 'shiny';
+export type VoucherTier = 'common' | 'plus' | 'premium';
+
 export interface RogueMemberState {
   uid: string;
   set: PokemonSet;
@@ -11,7 +16,8 @@ export interface RogueMemberState {
   fainted: boolean;
   status: '' | 'brn' | 'par' | 'slp' | 'frz' | 'psn' | 'tox';
   movePp: Record<string, number>;
-  boostStacks: Record<string, number>; // 携带属性增伤/树果叠加记录
+  boostStacks: Record<string, number>;
+  awakened?: boolean; // 糖果觉醒被动：每波自动微回血 + 全能力 IV 31 精炼标记
 }
 
 export interface ActiveWaveBuff {
@@ -22,7 +28,9 @@ export interface ActiveWaveBuff {
 
 export interface RogueRunSave {
   version: number;
+  mode: RogueGameMode;
   wave: number;
+  biomeId: string;
   biomeIndex: number;
   money: number;
   balls: {
@@ -38,7 +46,13 @@ export interface RogueRunSave {
     amuletCoin: number;
     healingCharm: number;
     shinyCharm: number;
+    townMap: number;      // 城镇地图：每10层解锁3条透明情报群系分支路线
+    lockCapsule: number;  // 锁定胶囊：商店刷新时可锁定当前三选一精灵球品质不降级
+    teraOrb: number;      // 太晶宝珠：解锁每战太晶化权限
   };
+  lureWavesLeft: number;  // 引虫诱饵剩余波数（大于0时高概率触发野生2v2双打遭遇！）
+  rarityLocked: boolean;  // 当前整备商店是否开启了锁品质刷新
+  pendingBiomeChoices?: string[]; // 第10波关底待玩家抉择的下一群系分支ID列表
   waveBuffs: ActiveWaveBuff[];
   party: RogueMemberState[];
   inShopPhase: boolean;
@@ -46,21 +60,50 @@ export interface RogueRunSave {
   updatedAt: string;
 }
 
+export interface StarterUpgradeRecord {
+  costReduction: number; // 0 | 1 | 2（糖果永久减费）
+  awakened: boolean;     // 糖果觉醒：满个体 6V + 每波战后额外再生回复
+  shinyUnlocked: boolean;
+  useShiny: boolean;
+  unlockedEggMoves: string[];
+}
+
+export interface IncubatingEgg {
+  id: string;
+  tier: EggTier;
+  machine: GachaMachineType;
+  targetSpeciesId?: string; // 若由糖果定向兑换，则锁定对应初始宝可梦
+  wavesRemaining: number;
+  totalWaves: number;
+  createdAt: string;
+}
+
+export interface HatchedEggResult {
+  eggTier: EggTier;
+  speciesId: string;
+  shiny: boolean;
+  isNewUnlock: boolean;
+  candyGained: number;
+  newEggMove?: string;
+}
+
 export interface MetaProgressSave {
   unlockedStarters: string[];
   starterCandies: Record<string, number>;
+  starterUpgrades: Record<string, StarterUpgradeRecord>;
+  vouchers: {
+    common: number;  // 单抽普通蛋券
+    plus: number;    // 五连精良蛋券（保底稀有蛋）
+    premium: number; // 十连黄金蛋券（保底史诗蛋）
+  };
+  eggs: IncubatingEgg[];
+  totalEggsHatched: number;
+  classicClears: number;
+  highestClassicWave: number;
+  highestEndlessWave: number;
   highestRogueWave: number;
   totalRogueRuns: number;
-  factoryBestStreakSingles: number;
-  factoryBestStreakDoubles: number;
-  officialWins: number;
-}
-
-export interface SavedCustomTeam {
-  id: string;
-  name: string;
-  isDoubles: boolean;
-  paste: string;
+  ribbonsSpecies: string[]; // 经典 200 层殿堂通关缎带宝可梦记录
 }
 
 export interface UserPreferencesSave {
@@ -71,21 +114,24 @@ export interface UserPreferencesSave {
 }
 
 const KEYS = {
-  ROGUE_RUN: 'prp_rogue_run_v1',
-  META: 'prp_meta_progress_v1',
-  TEAMS: 'prp_custom_teams_v1',
+  ROGUE_RUN: 'prp_rogue_run_v2',
+  LEGACY_RUN: 'prp_rogue_run_v1',
+  META: 'prp_meta_progress_v2',
+  LEGACY_META: 'prp_meta_progress_v1',
   PREFS: 'prp_user_prefs_v1',
 };
 
-const DEFAULT_STARTERS = [
+export const DEFAULT_STARTERS = [
   'bulbasaur', 'charmander', 'squirtle',
   'chikorita', 'cyndaquil', 'totodile',
   'treecko', 'torchic', 'mudkip',
   'turtwig', 'chimchar', 'piplup',
   'snivy', 'tepig', 'oshawott',
+  'chespin', 'fennekin', 'froakie',
   'rowlet', 'litten', 'popplio',
+  'grookey', 'scorbunny', 'sobble',
   'sprigatito', 'fuecoco', 'quaxly',
-  'pikachu', 'eevee', 'riolu', 'ralts', 'rookidee', 'gible', 'dreepy', 'frigibax',
+  'pikachu', 'eevee', 'riolu', 'ralts', 'rookidee', 'gible', 'dreepy', 'frigibax', 'charcadet',
 ];
 
 const memoryFallback = new Map<string, string>();
@@ -141,14 +187,52 @@ function safeSet(key: string, value: unknown): void {
   }
 }
 
+export function getDefaultUpgradeRecord(): StarterUpgradeRecord {
+  return {
+    costReduction: 0,
+    awakened: false,
+    shinyUnlocked: false,
+    useShiny: false,
+    unlockedEggMoves: [],
+  };
+}
+
 export const SaveStorage = {
   getRogueRun(): RogueRunSave | null {
     try {
-      const raw = storageGetRaw(KEYS.ROGUE_RUN);
+      const raw = storageGetRaw(KEYS.ROGUE_RUN) || storageGetRaw(KEYS.LEGACY_RUN);
       if (!raw) return null;
-      const parsed = JSON.parse(raw) as RogueRunSave;
+      const parsed = JSON.parse(raw) as Partial<RogueRunSave>;
       if (!parsed || !Array.isArray(parsed.party) || parsed.party.length === 0) return null;
-      return parsed;
+
+      return {
+        version: 2,
+        mode: parsed.mode || 'classic',
+        wave: parsed.wave || 1,
+        biomeId: parsed.biomeId || 'plains',
+        biomeIndex: parsed.biomeIndex || 0,
+        money: parsed.money ?? 1000,
+        balls: parsed.balls || { pb: 5, gb: 1, ub: 0, mb: 0 },
+        relics: {
+          expShare: parsed.relics?.expShare ?? 1,
+          luckyEgg: parsed.relics?.luckyEgg ?? 0,
+          expCharm: parsed.relics?.expCharm ?? 0,
+          amuletCoin: parsed.relics?.amuletCoin ?? 0,
+          healingCharm: parsed.relics?.healingCharm ?? 0,
+          shinyCharm: parsed.relics?.shinyCharm ?? 0,
+          townMap: parsed.relics?.townMap ?? 0,
+          lockCapsule: parsed.relics?.lockCapsule ?? 0,
+          teraOrb: parsed.relics?.teraOrb ?? 0,
+        },
+        lureWavesLeft: parsed.lureWavesLeft ?? 0,
+        rarityLocked: Boolean(parsed.rarityLocked),
+        pendingBiomeChoices: parsed.pendingBiomeChoices,
+        waveBuffs: parsed.waveBuffs || [],
+        party: parsed.party,
+        inShopPhase: Boolean(parsed.inShopPhase),
+        rerollCount: parsed.rerollCount || 0,
+        updatedAt: parsed.updatedAt || new Date().toISOString(),
+      };
     } catch {
       return null;
     }
@@ -161,49 +245,90 @@ export const SaveStorage = {
 
   clearRogueRun(): void {
     storageRemoveRaw(KEYS.ROGUE_RUN);
+    storageRemoveRaw(KEYS.LEGACY_RUN);
   },
 
   getMeta(): MetaProgressSave {
     const def: MetaProgressSave = {
       unlockedStarters: [...DEFAULT_STARTERS],
       starterCandies: {},
+      starterUpgrades: {},
+      // 新手开局礼赠：3张单抽券 + 2张五连精良券，首次进游戏即可爽抽扭蛋机！
+      vouchers: {
+        common: 3,
+        plus: 2,
+        premium: 0,
+      },
+      eggs: [],
+      totalEggsHatched: 0,
+      classicClears: 0,
+      highestClassicWave: 0,
+      highestEndlessWave: 0,
       highestRogueWave: 0,
       totalRogueRuns: 0,
-      factoryBestStreakSingles: 0,
-      factoryBestStreakDoubles: 0,
-      officialWins: 0,
+      ribbonsSpecies: [],
     };
-    const meta = safeGet(KEYS.META, def);
+
+    const rawV2 = storageGetRaw(KEYS.META);
+    const rawV1 = !rawV2 ? storageGetRaw(KEYS.LEGACY_META) : null;
+    const base = rawV2
+      ? safeGet(KEYS.META, def)
+      : rawV1
+        ? { ...def, ...JSON.parse(rawV1), vouchers: def.vouchers }
+        : def;
+
+    if (!base.vouchers) base.vouchers = { ...def.vouchers };
+    if (!base.starterUpgrades) base.starterUpgrades = {};
+    if (!Array.isArray(base.eggs)) base.eggs = [];
+    if (!Array.isArray(base.ribbonsSpecies)) base.ribbonsSpecies = [];
+
     for (const s of DEFAULT_STARTERS) {
-      if (!meta.unlockedStarters.includes(s)) meta.unlockedStarters.push(s);
+      if (!base.unlockedStarters.includes(s)) base.unlockedStarters.push(s);
     }
-    return meta;
+    return base;
   },
 
   saveMeta(meta: MetaProgressSave): void {
     safeSet(KEYS.META, meta);
   },
 
-  unlockStarterAndCandy(speciesId: string, candyAmount = 1): void {
+  getStarterUpgrade(speciesId: string): StarterUpgradeRecord {
     const meta = this.getMeta();
+    return meta.starterUpgrades[speciesId] || getDefaultUpgradeRecord();
+  },
+
+  unlockStarterAndCandy(
+    speciesId: string,
+    candyAmount = 1,
+    opts?: { shiny?: boolean; eggMove?: string },
+  ): { isNewUnlock: boolean; newEggMove?: string } {
+    const meta = this.getMeta();
+    let isNewUnlock = false;
     if (!meta.unlockedStarters.includes(speciesId)) {
       meta.unlockedStarters.push(speciesId);
+      isNewUnlock = true;
     }
     meta.starterCandies[speciesId] = (meta.starterCandies[speciesId] || 0) + candyAmount;
-    this.saveMeta(meta);
-  },
 
-  getCustomTeams(): SavedCustomTeam[] {
-    try {
-      const raw = storageGetRaw(KEYS.TEAMS);
-      return raw ? (JSON.parse(raw) as SavedCustomTeam[]) : [];
-    } catch {
-      return [];
+    const upg = meta.starterUpgrades[speciesId] || getDefaultUpgradeRecord();
+    if (opts?.shiny) {
+      upg.shinyUnlocked = true;
+      upg.useShiny = true;
     }
+    let learnedEggMove: string | undefined;
+    if (opts?.eggMove && !upg.unlockedEggMoves.includes(opts.eggMove)) {
+      upg.unlockedEggMoves.push(opts.eggMove);
+      learnedEggMove = opts.eggMove;
+    }
+    meta.starterUpgrades[speciesId] = upg;
+    this.saveMeta(meta);
+    return { isNewUnlock, newEggMove: learnedEggMove };
   },
 
-  saveCustomTeams(teams: SavedCustomTeam[]): void {
-    safeSet(KEYS.TEAMS, teams);
+  addVoucher(tier: VoucherTier, count = 1): void {
+    const meta = this.getMeta();
+    meta.vouchers[tier] = (meta.vouchers[tier] || 0) + count;
+    this.saveMeta(meta);
   },
 
   getPrefs(): UserPreferencesSave {

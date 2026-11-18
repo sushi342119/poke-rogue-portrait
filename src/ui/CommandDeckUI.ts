@@ -313,11 +313,13 @@ export class CommandDeckUI {
       this.req.side.pokemon.filter((p) => p.active)[this.currentSlotIdx];
 
     const actorName = activeTracked?.zhSpecies || activeSideMon?.zhName || '宝可梦';
-    const canTeraType = !this.teraUsedInQueue ? activeSlotReq?.canTerastallize : undefined;
+    const run = this.rogueManager.getRun();
+    const teraUnlocked = !run || (run.relics.teraOrb || 0) > 0;
+    const canTeraType =
+      teraUnlocked && !this.teraUsedInQueue ? activeSlotReq?.canTerastallize : undefined;
     const teraTheme = canTeraType ? TYPE_THEMES[canTeraType] || TYPE_THEMES.Stellar : null;
 
     // 肉鸽精灵球库存统计
-    const run = this.rogueManager.getRun();
     const totalBalls = run
       ? run.balls.pb + run.balls.gb + run.balls.ub + run.balls.mb
       : 0;
@@ -325,6 +327,7 @@ export class CommandDeckUI {
     // 计算当前招式对敌方目标的实时克制提示
     const foePrimary = this.engine.slots.get('p2a');
     const foeSecondary = this.engine.slots.get('p2b');
+    const aliveWildFoes = [foePrimary, foeSecondary].filter((f) => f && !f.fainted);
 
     const moves = activeSlotReq?.moves || [];
     const moveButtonsHtml = moves
@@ -339,15 +342,12 @@ export class CommandDeckUI {
             const eff = getTypeEffectiveness(effectiveType, foePrimary.types);
             const b = formatEffBadge(eff);
             if (b) effBadgeHtml = `<span class="move-eff-tag ${b.cls}">${b.text}</span>`;
-          } else if (isDoubles) {
-            const aliveFoes = [foePrimary, foeSecondary].filter((f) => f && !f.fainted);
-            if (aliveFoes.length > 0) {
-              const bestEff = Math.max(
-                ...aliveFoes.map((f) => getTypeEffectiveness(effectiveType, f!.types)),
-              );
-              const b = formatEffBadge(bestEff);
-              if (b) effBadgeHtml = `<span class="move-eff-tag ${b.cls}">${b.text}</span>`;
-            }
+          } else if (isDoubles && aliveWildFoes.length > 0) {
+            const bestEff = Math.max(
+              ...aliveWildFoes.map((f) => getTypeEffectiveness(effectiveType, f!.types)),
+            );
+            const b = formatEffBadge(bestEff);
+            if (b) effBadgeHtml = `<span class="move-eff-tag ${b.cls}">${b.text}</span>`;
           }
         }
 
@@ -377,9 +377,11 @@ export class CommandDeckUI {
       })
       .join('');
 
-    // 精灵球快捷投掷条（仅肉鸽可收服战斗展开时显示）
+    // 精灵球快捷投掷条（支持单打与野生 2v2 双打先击倒 1 只后投球规则）
     let pokeballDrawerHtml = '';
-    if (this.context.canCatch && this.ballTrayOpen && run && foePrimary && !foePrimary.fainted) {
+    if (this.context.canCatch && this.ballTrayOpen && run && aliveWildFoes.length > 0) {
+      const twoWildAlive = aliveWildFoes.length >= 2;
+      const targetWild = aliveWildFoes[0]!;
       const ballSpecs: Array<{ tier: BallTier; zh: string; count: number }> = [
         { tier: 'pb', zh: '精灵球', count: run.balls.pb },
         { tier: 'gb', zh: '超级球', count: run.balls.gb },
@@ -390,20 +392,28 @@ export class CommandDeckUI {
         <div class="sd-ball-drawer">
           ${ballSpecs
             .map((b) => {
-              const pct = this.rogueManager.estimateCatchProbability(
-                b.tier,
-                foePrimary.species,
-                foePrimary.hpPercent,
-                foePrimary.status,
-                foePrimary.bossShieldRemaining,
-              );
-              const disabled = b.count <= 0 || foePrimary.bossShieldRemaining > 0;
+              const pct = twoWildAlive
+                ? 0
+                : this.rogueManager.estimateCatchProbability(
+                    b.tier,
+                    targetWild.species,
+                    targetWild.hpPercent,
+                    targetWild.status,
+                    targetWild.bossShieldRemaining,
+                  );
+              const disabled =
+                b.count <= 0 || twoWildAlive || targetWild.bossShieldRemaining > 0;
+              const subTxt = twoWildAlive
+                ? '先击倒1只'
+                : targetWild.bossShieldRemaining > 0
+                  ? '需先破盾'
+                  : `捕获率 ${pct}%`;
               return `
                 <button type="button" class="ball-throw-btn tier-${b.tier} ${disabled ? 'is-disabled' : ''}" data-ball="${b.tier}" ${disabled ? 'disabled' : ''}>
                   <img src="./assets/pr/pokeball/${b.tier}.png" alt="${b.zh}" />
                   <div>
                     <strong>${b.zh} ×${b.count}</strong>
-                    <span>${foePrimary.bossShieldRemaining > 0 ? '需先破盾' : `捕获率 ${pct}%`}</span>
+                    <span>${subTxt}</span>
                   </div>
                 </button>
               `;
